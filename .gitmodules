@@ -1,0 +1,3 @@
+[submodule "rfam"]
+	path = rfam
+	url = https://github.com/mhorlacher/rfam.git
