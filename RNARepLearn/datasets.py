@@ -6,9 +6,9 @@ import pandas as pd
 import numpy as np
 import random
 
-class SingleMaskedRfamDataset(torch_geometric.data.Dataset): 
+class SingleRfamDataset(torch_geometric.data.Dataset): 
     
-    ###Contains single RFAM family with masked sequence
+    ###Contains single RFAM family
     
     def __init__(self, rfam_dir, rfam_id, percentage, transform=None, pre_transform=None, pre_filter=None):
         self.percentage=percentage
@@ -40,13 +40,6 @@ class SingleMaskedRfamDataset(torch_geometric.data.Dataset):
         else:
             return vec
     
-    def mask(self,seq,percentage):
-        mask = [random.randrange(100) < percentage for i in range(len(seq))]
-        for i, nuc in enumerate(seq):
-            if (mask[i]):
-                seq[i]=[0.0,0.0,0.0,0.0]
-        return seq
-    
     def generate_edges(self,seq_len,bpp):
         X = np.zeros((seq_len,seq_len))
         X[np.triu_indices(X.shape[0], k = 1)] = bpp
@@ -55,7 +48,7 @@ class SingleMaskedRfamDataset(torch_geometric.data.Dataset):
         np.fill_diagonal(df.values, np.nan)
         adf = df.stack().reset_index()
         adf = adf.rename(columns={"level_0":"A","level_1":"B",0:"weight"})
-        return (adf.loc[adf["weight"]!=0.0])[["A","B"]].to_numpy()
+        return (adf.loc[adf["weight"]!=0.0])
     
     
     def process(self):
@@ -75,13 +68,14 @@ class SingleMaskedRfamDataset(torch_geometric.data.Dataset):
                         seq = self.one_hot_encode(array.item()['seq_int'])
                         if seq is None: ## if sequence contains unknown base 
                             continue
-                        mask = torch.tensor(self.mask(seq,self.percentage))
                         seq = torch.tensor(seq)
                         classes = torch.tensor(array.item()['seq_int'])
                         
-                        struc = torch.tensor(self.generate_edges(len(array.item()['seq_int']),array.item()['bpp']))
+                        edge_data = self.generate_edges(len(array.item()['seq_int']),array.item()['bpp'])
+                        edges = torch.tensor(edge_data[["A","B"]].to_numpy())
+                        edge_weights = torch.tensor(edge_data["weight"].to_numpy())
                         rfam_id = array.item()['id'].replace("/","_")
-                        torch.save({"seq":seq,"mask": mask, "edges":struc, "rfam":array.item()['rfam_id'],"classes":classes ,"id":rfam_id}, os.path.join(self.dir, self.id,"pt",rfam_id+".pt"))
+                        torch.save({"seq":seq, "edges":edges, "egde_weights":edge_weights, "rfam":array.item()['rfam_id'],"classes":classes ,"id":rfam_id}, os.path.join(self.dir, self.id,"pt",rfam_id+".pt"))
 
                     except pickle.UnpicklingError:
                         
@@ -96,4 +90,4 @@ class SingleMaskedRfamDataset(torch_geometric.data.Dataset):
     def __getitem__(self, index):
         self.processed_file_names[index]
         data = torch.load(os.path.join(self.dir,self.id,"pt",self.processed_file_names[index]))
-        return torch_geometric.data.Data(x=data["mask"],edge_index=data["edges"].t().contiguous(),y=data["seq"],rfam=data["rfam"],ID=data["id"])
+        return torch_geometric.data.Data(x=data["seq"],edge_index=data["edges"].t().contiguous(),edge_attr=data["egde_weights"],rfam=data["rfam"],ID=data["id"])
