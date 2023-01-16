@@ -1,19 +1,22 @@
 import torch
-from torch_geometric.nn import GCNConv
+import torch_geometric
+from torch_geometric.nn import Linear, GCNConv
 import torch.nn.functional as F
 
-class GCNConv_layer(torch.nn.Module):
-    def __init__(self, node_features, output_dimension,dropout_rate=0.02):
+
+# H(l-1)AW
+class LinearAggregation(torch_geometric.nn.MessagePassing):
+    def __init__(self, input_channels, output_channels):
         super().__init__()
-        self.conv1 = GCNConv(node_features, output_dimension)
+        self.lin = Linear(input_channels, output_channels).double() #H(l-1)W
 
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
+    def forward(self,x, edge_index, edge_weight):
+        x = self.lin(x)
 
-        #build representation
-        # input -> V_N,D
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = F.dropout(x, training=self.training)
+        x = self.propagate(edge_index, x=x, norm=edge_weight)
 
-        return F.softmax(x, dim=1)
+        return x
+
+    def message(self, x_j, edge_index, norm):
+        return norm.view(-1,1) * x_j
+

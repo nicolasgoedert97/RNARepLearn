@@ -160,4 +160,3 @@ class CombinedRfamDataset(torch_geometric.data.Dataset):
         data = torch.load(os.path.join(self.dir,self.processed_file_names[index]))
         return torch_geometric.data.Data(x=data["seq"],edge_index=data["edges"].t().contiguous(),edge_weight=data["egde_weights"],rfam=data["rfam"],ID=data["id"])
 
-    
