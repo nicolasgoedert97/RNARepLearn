@@ -42,3 +42,8 @@ training = MaskedTraining(model, 10, 15, writer)
 
 training.run(train_loader, val_loader)
 ``` 
+## Command line excecution
+Define datasets and other parameters inside config.gin
+``` 
+rnareplearn --gin config.gin
+``` 
