@@ -1,2 +1,0 @@
-[console_scripts]
-rnareplearn = RNARepLearn.command_line:main

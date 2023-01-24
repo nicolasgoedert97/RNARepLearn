@@ -1,2 +1,4 @@
-RNAREPLearn.egg-info
-RNAREPLearn.egg-info/*
+rnareplearn.egg-info/
+build/
+
+
