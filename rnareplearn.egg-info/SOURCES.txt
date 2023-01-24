@@ -5,6 +5,7 @@ RNARepLearn/__main__.py
 RNARepLearn/command_line.py
 RNARepLearn/datasets.py
 RNARepLearn/layers.py
+RNARepLearn/losses.py
 RNARepLearn/models.py
 RNARepLearn/modules.py
 RNARepLearn/train.py

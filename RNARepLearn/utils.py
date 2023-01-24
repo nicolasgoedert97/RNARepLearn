@@ -45,5 +45,3 @@ def train_val_test_loaders(dataset, train_split, test_split, val_split, batch_si
     train_set, test_set, val_set = torch.utils.data.random_split(dataset, [train_size, test_size, val_size])
 
     return DataLoader(train_set, batch_size=batch_size, shuffle=True), DataLoader(val_set, batch_size=batch_size, shuffle=True), DataLoader(test_set, batch_size=batch_size)
-
-
