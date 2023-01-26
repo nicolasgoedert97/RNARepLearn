@@ -10,8 +10,5 @@ def TestModel():
     return model
 
 
-class RPINetNodeEdgeMasking(torch_geometric.nn.Module):
-    def __init__(self, ):
-        self.encoding_layers = ...
 
 
