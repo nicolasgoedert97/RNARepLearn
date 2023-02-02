@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 import random
 import warnings
+from .utils import one_hot_encode, generate_edges, sequence2int_np, computeBPPM
+
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 class SingleRfamDataset(torch_geometric.data.Dataset): 
@@ -29,47 +31,6 @@ class SingleRfamDataset(torch_geometric.data.Dataset):
             return []
     
     
-    def one_hot_encode(self, seq):
-        nuc_d = {0:[1.0,0.0,0.0,0.0],
-                 1:[0.0,1.0,0.0,0.0],
-                 2:[0.0,0.0,1.0,0.0],
-                 3:[0.0,0.0,0.0,1.0],
-                 -25:[0.0,0.0,0.0,0.0]} ##for bases other than ATGCU in rfam sequences / these sequences are removed from the dataset
-        vec=np.array([nuc_d[x] for x in seq])
-        if [0.0,0.0,0.0,0.0] in vec.tolist():
-            return None
-        else:
-            return vec
-    
-    def generate_edges(self,seq_len,bpp):
-        X = np.zeros((seq_len,seq_len))
-        X[np.triu_indices(X.shape[0], k = 1)] = bpp
-        X = X+X.T
-
-        df = pd.DataFrame(X)
-        unpaired_probs = 1-df.sum(axis=1)
-        np.fill_diagonal(df.values, unpaired_probs)
-        adf = df.stack().reset_index()
-        adf = adf.rename(columns={"level_0":"A","level_1":"B",0:"h_bond"})
-        adf = adf[adf["h_bond"]!=0.0]
-
-        # Add Covalent bonds
-        # adf["cov_bond"]=0.0
-
-        # cov_bonds=[]
-        # for tupl in [(float(i),float(i+1)) for i in range(seq_len-1)]:
-        #     cov_bonds.append(tupl)
-        #     cov_bonds.append((tupl[1],tupl[0]))
-        # conv_bonds = pd.DataFrame(cov_bonds, columns=["A","B"])
-        # conv_bonds["h_bond"]=0.0
-        # conv_bonds["cov_bond"]=1.0
-        # adf.append(cov_bonds)
-
-        # adf.drop_duplicates(subset = ['A', 'B'],keep = 'last').reset_index()
-
-        return adf
-    
-    
     def process(self):
         if not os.path.exists(os.path.join(self.dir, self.id,"pt")):
             os.makedirs(os.path.join(self.dir, self.id,"pt"))
@@ -84,13 +45,13 @@ class SingleRfamDataset(torch_geometric.data.Dataset):
                         ## seq (node features one-hot encoded sequence) and classes (node classes) are essentially the same right now. Just for proof of concept
                         ## TODO replace with significant features (e.g. position/order in sequence)
                         
-                        seq = self.one_hot_encode(array.item()['seq_int'])
+                        seq = one_hot_encode(array.item()['seq_int'])
                         if seq is None: ## if sequence contains unknown base 
                             continue
                         seq = torch.tensor(seq)
                         classes = torch.tensor(array.item()['seq_int'])
                         
-                        edge_data = self.generate_edges(len(array.item()['seq_int']),array.item()['bpp'])
+                        edge_data = generate_edges(len(array.item()['seq_int']),array.item()['bpp'])
                         edges = torch.tensor(edge_data[["A","B"]].to_numpy())
                         edge_attributes = torch.tensor(edge_data["h_bond"].to_numpy())
                         rfam_id = array.item()['id'].replace("/","_")
@@ -162,3 +123,50 @@ class CombinedRfamDataset(torch_geometric.data.Dataset):
         data = torch.load(os.path.join(self.dir,self.processed_file_names[index]))
         return torch_geometric.data.Data(x=data["seq"],edge_index=data["edges"].t().contiguous(),edge_weight=data["edge_weight"],rfam=data["rfam"],ID=data["id"])
 
+
+class Dataset_UTR5(torch_geometric.data.Dataset):
+    def __init__(self, dataset_path):
+        self.dataset_path = dataset_path
+        self.files = []
+        super().__init__(dataset_path)
+    
+    @property
+    def processed_file_names(self):
+        return self.files
+    
+    def process(self):
+        self.files = os.listdir(os.path.join(self.dataset_path,"pt"))
+
+    def __len__(self):
+        return len(self.processed_file_names)
+    
+    def __getitem__(self, index):
+        data = torch.load(os.path.join(self.dataset_path,"pt",self.files[index]))
+        return torch_geometric.data.Data(x=data["seq"],edge_index=data["edges"].t().contiguous(),edge_weight=data["edge_weight"],mrl=data["mrl"],ID=data["id"])
+
+class Dataset_UTR5_hetero(torch_geometric.data.Dataset):
+    def __init__(self, dataset_path):
+        self.dataset_path = dataset_path
+        self.files = []
+        super().__init__(dataset_path)
+    
+    @property
+    def processed_file_names(self):
+        return self.files
+    
+    def process(self):
+        self.files = os.listdir(os.path.join(self.dataset_path,"pt"))
+
+    def __len__(self):
+        return len(self.processed_file_names)
+    
+    def __getitem__(self, index):
+        data = torch.load(os.path.join(self.dataset_path,"pt",self.files[index]))
+        hetero_data = torch_geometric.data.HeteroData(x=data["seq"],edge_index={"b_pairs":data["edges"].t().contiguous(), "backbone":data["backbone_edges"]},edge_weight=data["edge_weight"],mrl=data["mrl"],ID=data["id"], library=data["library"], designed=data["designed"])
+        return hetero_data
+
+
+
+
+                    
+                

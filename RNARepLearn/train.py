@@ -9,14 +9,13 @@ from .losses import BppReconstructionLoss
 
 
 class Training:
-    def __init__(self, model, n_epochs, masked_percentage, writer=None, lr=0.01, weight_decay=5e-4):
+    def __init__(self, model, n_epochs, writer=None, lr=0.01, weight_decay=5e-4):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = model
         self.model.to(self.device)
         self.model = model.double()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         self.n_epochs = n_epochs
-        self.masked_percentage = masked_percentage
         self.writer = writer
 
         if self.writer is None:
@@ -25,8 +24,9 @@ class Training:
 
 
 class MaskedTraining(Training):
-    # def __init__(self, model, n_epochs, masked_percentage, writer, lr=0.01, weight_decay=5e-4):
-    #     super.__init__(model, n_epochs, masked_percentage, writer, lr, weight_decay)
+    def __init__(self, model, n_epochs, masked_percentage, writer, lr=0.01, weight_decay=5e-4):
+        super().__init__(model, n_epochs, writer, lr, weight_decay)
+        self.masked_percentage = masked_percentage
     
     def run(self, data_loader, val_loader=None):
         cel_loss = torch.nn.CrossEntropyLoss()
@@ -99,8 +99,6 @@ class MaskedTraining(Training):
 
 
 class AutoEncoder(Training):
-    # def __init__(self, model, n_epochs, masked_percentage, writer, lr=0.01, weight_decay=5e-4):
-    #     super.__init__(model, n_epochs, masked_percentage, writer, lr, weight_decay)
     
     def run(self, data_loader, val_loader=None):
         cel_loss = torch.nn.CrossEntropyLoss()
@@ -163,6 +161,55 @@ class AutoEncoder(Training):
                 self.writer.add_scalar("Loss_edges/val", edge_accuracy_val, step)
                 self.writer.add_scalar("Node_Accuracy/train", node_accuracy, step)
                 self.writer.add_scalar("Node_Accuracy/val", node_accuracy_val, step)
+                step+=1
+            self.writer.flush()
+        self.writer.close()
+
+
+class TETraining(Training):
+
+    def run(self, train_loader, val_loader=None):
+        print("Training running on device: "+str(self.device))
+        mse_loss = torch.nn.MSELoss()
+
+        self.model.train()
+
+        step=0
+        for epoch in range(self.n_epochs):
+            for idx, batch in enumerate(train_loader):
+
+                batch.to(self.device)
+                self.optimizer.zero_grad()
+
+
+                pred_MRL = self.model(batch)
+
+                loss = mse_loss(torch.unsqueeze(pred_MRL, 0), batch.mrl.double())
+
+                loss.backward()
+                self.optimizer.step()
+
+                val_loss = None
+                if val_loader is not None:
+                    self.model.eval()
+
+                    batch = next(iter(val_loader))
+                    batch.to(self.device)
+
+                    pred_MRL = self.model(batch)
+
+                    val_loss = mse_loss(torch.unsqueeze(pred_MRL, 0), batch.mrl.double())
+
+                    self.model.train()
+
+
+                if idx % 10 == 0:
+                    print('\r[Epoch %4d/%4d] [Batch %4d/%4d] Loss: % 2.2e Validation-Loss: % 2.2e' % (epoch + 1, self.n_epochs, 
+                                                                        idx + 1, len(train_loader), 
+                                                                        loss.item(),val_loss.item()))
+                self.writer.add_scalar("Loss/train", loss.item(), step)
+                self.writer.add_scalar("Loss/val", val_loss.item(), step)
+
                 step+=1
             self.writer.flush()
         self.writer.close()

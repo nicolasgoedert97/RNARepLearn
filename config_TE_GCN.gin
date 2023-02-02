@@ -1,9 +1,9 @@
 command_line.set_mode.app_mode = "TE"
 
 #setup dataset ##test "/lustre/groups/crna01/workspace/nicolas_msc/RNARepLearn/5utr/5UTR_design/processed/test"
-command_line.setup_data.basepath = "/lustre/groups/crna01/workspace/nicolas_msc/RNARepLearn/5utr/5UTR_design/processed/test"
-command_line.setup_data.train_val_test_splits = [0.8,0.1,0.1] #set val = 0 to skip validation
-command_line.setup_data.batch_size = 8
+command_line.setup_data.basepath = "/lustre/groups/crna01/workspace/nicolas_msc/RNARepLearn/5utr/5UTR_Optimizer/processed/concat"
+command_line.setup_data.train_val_test_splits = [0.8, 0.02, 0.18] #set val = 0 to skip validation
+command_line.setup_data.batch_size = 64
 
 #setup training
 ## chose input/embedding dimensions
@@ -11,11 +11,11 @@ models.Encoder_Decoder_Model.input_channels = 4
 models.Encoder_Decoder_Model.output_channels = 64
 
 command_line.train.mode = "TE" #TE, autoencode, masked
-command_line.train.encoder = "RPI" #RPI, CNN, GCN
+command_line.train.encoder = "GCN" #RPI, CNN, GCN
 command_line.train.decoder = "TE"  #TE, SeqStruc
 
-command_line.train.n_epochs = 500
-command_line.train.log_dir = "notebooks/runs/overfittest"
+command_line.train.n_epochs = 10
+command_line.train.log_dir = "notebooks/runs/4k_GCN_10e_3el"
 
 
 ## Global Encoder settings
