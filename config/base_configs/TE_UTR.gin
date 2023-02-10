@@ -1,0 +1,27 @@
+command_line.setup_data.dataset_type = "UTR"
+
+#setup dataset ##test "/lustre/groups/crna01/workspace/nicolas_msc/RNARepLearn/5utr/5UTR_design/processed/test"
+command_line.setup_data.basepath = "/lustre/groups/crna01/workspace/nicolas_msc/RNARepLearn/5utr/5UTR_design/processed/designed_library"
+command_line.setup_data.train_val_test_splits = [0.6,0.001,0.399] #set val to 0 to skip validation
+
+#TE, autoencode, masked
+command_line.train.mode = "TE" 
+#RPI, CNN, GCN
+command_line.train.encoder = "RPI"
+#TE, SeqStruc
+command_line.train.decoder = "TE"  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

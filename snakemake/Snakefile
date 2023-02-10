@@ -1,0 +1,29 @@
+import os
+
+
+rule all:
+    input:
+        expand(os.path.join(config['output-path'], "{gin}"), gin= [g[:-4] for g in os.listdir(os.path.join(config['gin-path'],"gin"))])
+    
+# rule create_gins:
+#     input:
+#         base = config['gin-base'],
+#         grid = config['gin-grid'],
+#         out= config['output-path']
+#     output:
+#         path = directory(config["gin-path"]),
+#         done = os.path.join(config["gin-path"],".done")
+#     shell:
+#         "python config/create_configs.py --base-gin {input.base} --grid-gin {input.grid} --output-path {output.path} --log-dir {input.out}"
+
+
+
+rule train:
+    input:
+        os.path.join(config['gin-path'],"gin","{gin}.gin")
+    output:
+        directory(os.path.join(config['output-path'], "{gin}"))
+    shell:
+        """
+        rnareplearn --gin {input} --output {output} || true
+        """

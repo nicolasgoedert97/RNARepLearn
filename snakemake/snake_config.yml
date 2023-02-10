@@ -1,0 +1,3 @@
+gin-path: "/lustre/groups/crna01/workspace/nicolas_msc/RNARepLearn/config/TE_RPI_grid"
+
+output-path: "/lustre/groups/crna01/workspace/nicolas_msc/runs/TE_RPI_grid"

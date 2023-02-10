@@ -1,4 +1,11 @@
 rnareplearn.egg-info/
 build/
-notebooks/runs/
-5utr/
+notebooks/runs
+notebooks/.ipynb_checkpoints
+5utr/**
+snakemake/.snakemake
+
+config/*
+!config/base_configs
+!config/grid_configs
+!config/create_configs.py

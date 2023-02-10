@@ -6,9 +6,10 @@ import pandas as pd
 import numpy as np
 import random
 import warnings
-from .utils import one_hot_encode, generate_edges, sequence2int_np, computeBPPM
+from .utils import one_hot_encode, generate_edges, sequence2int_np
 
 warnings.filterwarnings("ignore", category=FutureWarning)
+
 
 class SingleRfamDataset(torch_geometric.data.Dataset): 
     
@@ -125,11 +126,13 @@ class CombinedRfamDataset(torch_geometric.data.Dataset):
 
 
 class Dataset_UTR5(torch_geometric.data.Dataset):
-    def __init__(self, dataset_path):
+    def __init__(self, dataset_path, mask=False):
         self.dataset_path = dataset_path
         self.files = []
+        self.mask = mask
         super().__init__(dataset_path)
-    
+
+
     @property
     def processed_file_names(self):
         return self.files

@@ -30,7 +30,9 @@ class RPINetGNNLayer(torch_geometric.nn.MessagePassing):
         self.lstm = LSTM(output_channels, output_channels, batch_first=True)
 
     def forward(self, x, h0, c0, edge_index, batch, edge_weight):
-
+        #x = [b_S, Lenghth, embed]
+        #h0 = [1,b_S, embed_dim]
+        #
         
         ## py_geometric databatch -> batched tensor / Adds fake nodes to keep length equal
         batched_x, mask = to_dense_batch(x, batch)
@@ -41,6 +43,7 @@ class RPINetGNNLayer(torch_geometric.nn.MessagePassing):
         ## convolution 
         conv_x = self.conv(batched_x)
 
+        # TODO replace with gnn op
         # AH(l-1)W -- Linear projection H(l-1)W -> Aggregated over adjacent neighbour nodes
         lin_x = self.lin(x)
         lin_x, _= to_dense_batch(self.propagate(edge_index, x=lin_x, norm=edge_weight), batch)

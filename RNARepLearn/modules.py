@@ -24,8 +24,7 @@ class LinearEmbedding(torch.nn.Module):
 class RPINetEncoder(torch.nn.Module):
     def __init__(self, input_channels, output_channels, n_layers, conv_kernel_size ,dim_step=None):
         super().__init__()
-
-        self.conv
+        
         layers = []
         final_output_channels = output_channels
         for i in range(n_layers):
@@ -94,9 +93,11 @@ class TE_Decoder(torch.nn.Module):
         self.linear = Linear(input_channels, 1)
     
     def forward(self, batch):
-        x = self.linear(batch.x)
+        
 
-        x = global_mean_pool(x, batch.batch)
+        x = global_mean_pool(batch.x, batch.batch)
+
+        x = self.linear(x)
 
         return x.squeeze()
         

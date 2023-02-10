@@ -1,0 +1,1 @@
+snakemake --cluster "sbatch -J slurm_test -t 12:00:00 -p gpu_p --gpus=1 --qos=gpu --mem=16G --nice=10000 -o /home/icb/vnicolas.goedert/workspace/slurm/joblog/rnareplearn_%A.job -e /home/icb/vnicolas.goedert/workspace/slurm/joblog/rnareplearn_%A.job" --configfile snake_config.yml -j 1

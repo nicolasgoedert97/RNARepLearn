@@ -23,12 +23,14 @@ class Training:
             self.writer = SummaryWriter()
 
 
+@gin.configurable
 class MaskedTraining(Training):
     def __init__(self, model, n_epochs, masked_percentage, writer, lr=0.01, weight_decay=5e-4):
         super().__init__(model, n_epochs, writer, lr, weight_decay)
         self.masked_percentage = masked_percentage
     
     def run(self, data_loader, val_loader=None):
+        print("Training running on device: "+str(self.device))
         cel_loss = torch.nn.CrossEntropyLoss()
         kl_loss = torch.nn.KLDivLoss(reduction='batchmean')
 
@@ -37,25 +39,26 @@ class MaskedTraining(Training):
         step=0
         for epoch in range(self.n_epochs):
             for idx, batch in enumerate(data_loader):
-                
-                true_x = torch.clone(batch.x)
-                true_edges = torch.clone(batch.edge_weight)
 
-                nuc_mask, edge_mask = mask_batch(batch,self.masked_percentage)
+                true_x = torch.clone(batch.x)
+                true_weights = torch.clone(batch.edge_weight)
+
+                train_mask = mask_batch(batch,self.masked_percentage)
+
                 batch.to(self.device)
                 self.optimizer.zero_grad()
-                
+
                 nucs, bpp = self.model(batch)
 
-                node_loss = cel_loss(nucs.cpu()[nuc_mask],true_x[nuc_mask])
-                edge_loss = kl_loss(to_dense_batch(bpp.cpu(), batch.batch.cpu())[0][:,:,nuc_mask].log(), to_dense_batch(torch.tensor(reconstruct_bpp(batch.edge_index.cpu(), true_edges, (len(bpp),len(bpp)))), batch.batch.cpu())[0][:,:,nuc_mask])
+                node_loss = cel_loss(nucs.cpu()[train_mask],true_x[train_mask])
+                edge_loss = kl_loss(bpp[train_mask][:,train_mask].cpu().log(), torch.tensor(reconstruct_bpp(batch.edge_index.detach().cpu(), true_weights.cpu(), (batch.x.shape[0],batch.x.shape[0])))[train_mask][:,train_mask] )
                 
-                loss = node_loss*100 + edge_loss
+                loss = node_loss + edge_loss
 
                 loss.backward()
                 self.optimizer.step()
                 
-                node_accuracy = int((nucs.cpu()[nuc_mask].argmax(dim=1)==true_x[nuc_mask].argmax(dim=1)).sum()) / sum(nuc_mask)
+                node_accuracy = int((nucs.cpu()[train_mask].argmax(dim=1)==true_x[train_mask].argmax(dim=1)).sum()) / sum(train_mask)
 
                 node_accuracy_val = None
                 edge_loss_val = None
@@ -67,14 +70,22 @@ class MaskedTraining(Training):
 
                     for batch in val_loader:
                         true_x = torch.clone(batch.x)
-                        true_edges = torch.clone(batch.edge_weight)
-                        nuc_mask, edge_mask = mask_batch(batch,15)
+                        true_weights = torch.clone(batch.edge_weight)
+
+                        train_mask = mask_batch(batch,15)
                         batch.to(self.device)
                         self.optimizer.zero_grad()
                 
                         nucs, bpp = self.model(batch)
-                        node_accuracy_val.append(int((nucs.cpu()[nuc_mask].argmax(dim=1)==true_x[nuc_mask].argmax(dim=1)).sum()) / sum(nuc_mask))
-                        edge_loss_val.append(int(kl_loss(to_dense_batch(bpp.cpu(), batch.batch.cpu())[0][:,:,nuc_mask].log(), to_dense_batch(torch.tensor(reconstruct_bpp(batch.edge_index.cpu(), true_edges, (len(bpp),len(bpp)))), batch.batch.cpu())[0][:,:,nuc_mask])))
+                        edge_loss_debug = kl_loss(bpp[train_mask][:,train_mask].cpu().log(), torch.tensor(reconstruct_bpp(batch.edge_index.detach().cpu(), true_weights.cpu(), (batch.x.shape[0],batch.x.shape[0])))[train_mask][:,train_mask] )
+                        if torch.isnan(edge_loss_debug):
+                            print(bpp[train_mask][:,train_mask].cpu())
+                            print("--------------->>>")
+                            print(torch.tensor(reconstruct_bpp(batch.edge_index.detach().cpu(), batch.edge_weight.detach().cpu(), (batch.x.shape[0],batch.x.shape[0])))[train_mask][:,train_mask])
+                            print("--------------->>>")
+                            print(batch.ID)
+                        node_accuracy_val.append(int((nucs.cpu()[train_mask].argmax(dim=1)==true_x[train_mask].argmax(dim=1)).sum()) / sum(train_mask))
+                        edge_loss_val.append(float(edge_loss_debug))
 
                     node_accuracy_val = sum(node_accuracy_val)/len(node_accuracy_val)
                     edge_loss_val = sum(edge_loss_val)/len(edge_loss_val)
