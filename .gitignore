@@ -9,3 +9,5 @@ config/*
 !config/base_configs
 !config/grid_configs
 !config/create_configs.py
+
+RNARepLearn/__pychache__

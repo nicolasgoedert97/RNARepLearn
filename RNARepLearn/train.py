@@ -43,7 +43,7 @@ class MaskedTraining(Training):
                 true_x = torch.clone(batch.x)
                 true_weights = torch.clone(batch.edge_weight)
 
-                train_mask = mask_batch(batch,self.masked_percentage)
+                train_mask = mask_batch(batch,self.masked_percentage, False)
 
                 batch.to(self.device)
                 self.optimizer.zero_grad()
@@ -72,27 +72,20 @@ class MaskedTraining(Training):
                         true_x = torch.clone(batch.x)
                         true_weights = torch.clone(batch.edge_weight)
 
-                        train_mask = mask_batch(batch,15)
+                        train_mask = mask_batch(batch,self.masked_percentage, False)
                         batch.to(self.device)
                         self.optimizer.zero_grad()
                 
                         nucs, bpp = self.model(batch)
-                        edge_loss_debug = kl_loss(bpp[train_mask][:,train_mask].cpu().log(), torch.tensor(reconstruct_bpp(batch.edge_index.detach().cpu(), true_weights.cpu(), (batch.x.shape[0],batch.x.shape[0])))[train_mask][:,train_mask] )
-                        if torch.isnan(edge_loss_debug):
-                            print(bpp[train_mask][:,train_mask].cpu())
-                            print("--------------->>>")
-                            print(torch.tensor(reconstruct_bpp(batch.edge_index.detach().cpu(), batch.edge_weight.detach().cpu(), (batch.x.shape[0],batch.x.shape[0])))[train_mask][:,train_mask])
-                            print("--------------->>>")
-                            print(batch.ID)
+                        edge_loss_val_step = kl_loss(bpp[train_mask][:,train_mask].cpu().log(), torch.tensor(reconstruct_bpp(batch.edge_index.detach().cpu(), true_weights.cpu(), (batch.x.shape[0],batch.x.shape[0])))[train_mask][:,train_mask] )
                         node_accuracy_val.append(int((nucs.cpu()[train_mask].argmax(dim=1)==true_x[train_mask].argmax(dim=1)).sum()) / sum(train_mask))
-                        edge_loss_val.append(float(edge_loss_debug))
+                        edge_loss_val.append(float(edge_loss_val_step))
 
                     node_accuracy_val = sum(node_accuracy_val)/len(node_accuracy_val)
                     edge_loss_val = sum(edge_loss_val)/len(edge_loss_val)
-                    
-                    
+
                     self.model.train()
-                
+                    
                 
                 if idx % 10 == 0:
                     print('\r[Epoch %4d/%4d] [Batch %4d/%4d] Loss: % 2.2e Nucleotide-Loss: % 2.2e Edge-Loss: % 2.2e' % (epoch + 1, self.n_epochs, 

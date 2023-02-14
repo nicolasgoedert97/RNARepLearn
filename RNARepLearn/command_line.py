@@ -21,7 +21,6 @@ def main():
 
     args = parser.parse_args()
 
-        
 
     gin.parse_config_file(args.gin)
 
@@ -40,6 +39,7 @@ def main():
 
     if args.test_on_train:
         test(train_loader, model, log_dir, train_device, train_mode, "train")
+
 
 @gin.configurable
 def setup_data(basepath, train_val_test_splits, batch_size, dataset_type,rfams=None, seq_length_lim=None, dataset_name=None):
@@ -65,14 +65,18 @@ def setup_data(basepath, train_val_test_splits, batch_size, dataset_type,rfams=N
     return train, val, test, batch_size
 
 
+
+
 @gin.configurable
-def train(encoder, decoder, n_epochs, train_loader, batch_size, mode, masked_percentage=15 ,log_dir=None, val_loader=None, args=None):
+def train(encoder, decoder, n_epochs, train_loader, batch_size, mode, masked_percentage=15 ,model = None, log_dir=None, val_loader=None, args=None):
 
     writer = SummaryWriter(log_dir)
 
-    shutil.copyfile(args.gin ,os.path.join(writer.log_dir, "gin.config"))
+    if args is not None:
+        shutil.copyfile(args.gin ,os.path.join(writer.log_dir, "gin.config"))
 
-    model = Encoder_Decoder_Model(encoder=encoder, decoder=decoder,batch_size=batch_size)
+    if model is None:
+        model = Encoder_Decoder_Model(encoder=encoder, decoder=decoder,batch_size=batch_size)
 
     match mode:
         case "masked":
@@ -100,8 +104,6 @@ def test(test_loader, model, log_dir, device, test_mode, test_name):
         os.makedirs(os.path.join(log_dir, "test"))
 
     model.to(device)
-
-    
 
     for i, batch in enumerate(test_loader):
         batch.to(device)
