@@ -5,7 +5,7 @@ from scipy import sparse
 from torch_geometric.loader import DataLoader
 import pandas as pd
 
-def mask_batch(batch, percentage, set_zero=True):
+def mask_batch(batch, percentage, set_zero=True, seq_zero=True, struc_zero=True):
 
     diag = batch.edge_index[0]==batch.edge_index[1] ##true for self edges e.g. diagonal
     eq_1 = batch.edge_weight!=1 ##true for !=1 e.g. Only for bases with unpaired prob != 1
@@ -30,8 +30,11 @@ def mask_batch(batch, percentage, set_zero=True):
         masked_edges_index_from = np.where(np.isin(batch.edge_index[0],masked_bases))
         masked_edges_index_to = np.where(np.isin(batch.edge_index[1],masked_bases))
         masked_edges = np.union1d(masked_edges_index_from, masked_edges_index_to)
-        batch.x[mask] = torch.tensor([0.0,0.0,0.0,0.0],dtype=torch.float64)
-        batch.edge_weight[masked_edges]=0.0
+        
+        if (seq_zero):
+            batch.x[mask] = torch.tensor([0.0,0.0,0.0,0.0],dtype=torch.float64)
+        if(struc_zero):
+            batch.edge_weight[masked_edges]=0.0
     
     return mask
 

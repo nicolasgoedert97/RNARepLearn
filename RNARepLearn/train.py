@@ -1,8 +1,9 @@
 import torch
 from torch_geometric.utils import to_dense_batch
 import gin
+import os
 from torch.utils.tensorboard import SummaryWriter
-from .utils import mask_batch, reconstruct_bpp
+from .utils import mask_batch, reconstruct_bpp, EarlyStopper
 from .losses import BppReconstructionLoss
 
 
@@ -25,25 +26,36 @@ class Training:
 
 @gin.configurable
 class MaskedTraining(Training):
-    def __init__(self, model, n_epochs, masked_percentage, writer, lr=0.01, weight_decay=5e-4):
+    def __init__(self, model, n_epochs, masked_percentage, writer, lr=0.01, weight_decay=5e-4 , mask=True, mask_seq=True, mask_struc=False, validation_steps=5, node_loss_weight=1, edge_loss_weight=1):
         super().__init__(model, n_epochs, writer, lr, weight_decay)
         self.masked_percentage = masked_percentage
+        self.mask = mask
+        self.mask_seq = mask_seq
+        self.mask_struc = mask_struc
+        self.val_steps = validation_steps
+        self.edge_loss_weight = edge_loss_weight
+        self.node_loss_weight = node_loss_weight
+
     
     def run(self, data_loader, val_loader=None):
         print("Training running on device: "+str(self.device))
         cel_loss = torch.nn.CrossEntropyLoss()
         kl_loss = torch.nn.KLDivLoss(reduction='batchmean')
 
+        early_stop = EarlyStopper(patience=2)
+
         self.model.train()
 
         step=0
         for epoch in range(self.n_epochs):
+            epoch_loss = []
+            epoch_val_loss = []
             for idx, batch in enumerate(data_loader):
 
                 true_x = torch.clone(batch.x)
                 true_weights = torch.clone(batch.edge_weight)
 
-                train_mask = mask_batch(batch,self.masked_percentage, False)
+                train_mask = mask_batch(batch,self.masked_percentage, self.mask, self.mask_seq, self.mask_struc)
 
                 batch.to(self.device)
                 self.optimizer.zero_grad()
@@ -51,54 +63,81 @@ class MaskedTraining(Training):
                 nucs, bpp = self.model(batch)
 
                 node_loss = cel_loss(nucs.cpu()[train_mask],true_x[train_mask])
-                edge_loss = kl_loss(bpp[train_mask][:,train_mask].cpu().log(), torch.tensor(reconstruct_bpp(batch.edge_index.detach().cpu(), true_weights.cpu(), (batch.x.shape[0],batch.x.shape[0])))[train_mask][:,train_mask] )
+                edge_loss = kl_loss(bpp[train_mask].cpu(), torch.tensor(reconstruct_bpp(batch.edge_index.detach().cpu(), true_weights.cpu(), (batch.x.shape[0],batch.x.shape[0])))[train_mask] )
+
                 
-                loss = node_loss + edge_loss
+                loss = node_loss * self.node_loss_weight + edge_loss * self.edge_loss_weight
 
                 loss.backward()
                 self.optimizer.step()
                 
                 node_accuracy = int((nucs.cpu()[train_mask].argmax(dim=1)==true_x[train_mask].argmax(dim=1)).sum()) / sum(train_mask)
 
-                node_accuracy_val = None
+                node_loss_val = None
                 edge_loss_val = None
 
-                if val_loader is not None:
-                    self.model.eval()
-                    node_accuracy_val = []
-                    edge_loss_val = []
-
-                    for batch in val_loader:
-                        true_x = torch.clone(batch.x)
-                        true_weights = torch.clone(batch.edge_weight)
-
-                        train_mask = mask_batch(batch,self.masked_percentage, False)
-                        batch.to(self.device)
-                        self.optimizer.zero_grad()
-                
-                        nucs, bpp = self.model(batch)
-                        edge_loss_val_step = kl_loss(bpp[train_mask][:,train_mask].cpu().log(), torch.tensor(reconstruct_bpp(batch.edge_index.detach().cpu(), true_weights.cpu(), (batch.x.shape[0],batch.x.shape[0])))[train_mask][:,train_mask] )
-                        node_accuracy_val.append(int((nucs.cpu()[train_mask].argmax(dim=1)==true_x[train_mask].argmax(dim=1)).sum()) / sum(train_mask))
-                        edge_loss_val.append(float(edge_loss_val_step))
-
-                    node_accuracy_val = sum(node_accuracy_val)/len(node_accuracy_val)
-                    edge_loss_val = sum(edge_loss_val)/len(edge_loss_val)
-
-                    self.model.train()
-                    
                 
                 if idx % 10 == 0:
-                    print('\r[Epoch %4d/%4d] [Batch %4d/%4d] Loss: % 2.2e Nucleotide-Loss: % 2.2e Edge-Loss: % 2.2e' % (epoch + 1, self.n_epochs, 
+                    if val_loader is not None:
+                        self.model.eval()
+                        node_loss_val_list = []
+                        edge_loss_val_list = []
+                        node_accuracy_val_list = []
+
+                        with torch.no_grad():
+                            for i,batch in enumerate(val_loader):
+                                true_x = torch.clone(batch.x)
+                                true_weights = torch.clone(batch.edge_weight)
+
+                                train_mask = mask_batch(batch,self.masked_percentage, self.mask, self.mask_seq, self.mask_struc)
+                                batch.to(self.device)
+                        
+                                nucs, bpp = self.model(batch)
+                                edge_loss_val_step = kl_loss(bpp[train_mask].cpu(), torch.tensor(reconstruct_bpp(batch.edge_index.detach().cpu(), true_weights.cpu(), (batch.x.shape[0],batch.x.shape[0])))[train_mask] )
+                                node_loss_val_step = cel_loss(nucs.cpu()[train_mask],true_x[train_mask])
+                                node_accuracy_val_step = int((nucs.cpu()[train_mask].argmax(dim=1)==true_x[train_mask].argmax(dim=1)).sum()) / sum(train_mask)
+                                
+                                node_loss_val_list.append(node_loss_val_step.item())
+                                edge_loss_val_list.append(edge_loss_val_step.item())
+                                node_accuracy_val_list.append(node_accuracy_val_step.item())
+
+                                if i >= self.val_steps:
+                                    break
+
+                            node_loss_val = sum(node_loss_val_list)/len(node_loss_val_list)
+                            edge_loss_val = sum(edge_loss_val_list)/len(edge_loss_val_list)
+                            node_accuracy_val = sum(node_accuracy_val_list)/len(node_accuracy_val_list)
+
+                            val_loss = node_loss_val * self.node_loss_weight + edge_loss_val * self.edge_loss_weight
+
+                            self.writer.add_scalar("Loss/val", val_loss, step)
+                            self.writer.add_scalar("Loss_edges/val", edge_loss_val, step)
+                            self.writer.add_scalar("Node_Accuracy/val", node_accuracy_val, step)
+                            self.writer.add_scalar("Loss_nodes/val", node_loss_val, step)
+
+                            epoch_val_loss.append(val_loss)
+                            epoch_loss.append(loss)
+
+                        self.model.train()
+
+                    print('\r[Epoch %4d/%4d] [Batch %4d/%4d] Loss: % 2.2e Nucleotide-Loss: % 2.2e Edge-Loss: % 2.2e Val-Loss: % 2.2e Val-Edges: % 2.2e Val-Nodes % 2.2e Memory % 4d' % (epoch + 1, self.n_epochs, 
                                                                         idx + 1, len(data_loader), 
-                                                                        loss.item(),node_loss.item(),edge_loss.item()))
+                                                                        loss.item(),node_loss.item(),edge_loss.item(), val_loss, edge_loss_val, node_loss_val, torch.cuda.memory_allocated()))
                 self.writer.add_scalar("Loss/train", loss.item(), step)
                 self.writer.add_scalar("Loss_nodes/train", node_loss.item(), step)
                 self.writer.add_scalar("Loss_edges/train", edge_loss.item(), step)
-                self.writer.add_scalar("Loss_edges/val", edge_loss_val, step)
                 self.writer.add_scalar("Node_Accuracy/train", node_accuracy, step)
-                self.writer.add_scalar("Node_Accuracy/val", node_accuracy_val, step)
+                
                 step+=1
+            
+            self.writer.add_scalar("Epoch_loss/train", sum(epoch_loss)/len(epoch_loss), epoch)
+            self.writer.add_scalar("Epoch_loss/val", sum(epoch_val_loss)/len(epoch_val_loss), epoch)
+
             self.writer.flush()
+            torch.save(self.model.state_dict(), os.path.join(self.writer.log_dir, "model_epoch"+str(epoch)))
+            if early_stop.early_stop(sum(epoch_val_loss)/len(epoch_val_loss)):
+                print("Earlystopped after Epoch "+str(epoch)+" with patience of "+str(early_stop.patience))
+                break
         self.writer.close()
 
 

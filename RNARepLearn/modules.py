@@ -68,7 +68,7 @@ class AttentionDecoder(torch.nn.Module):
         
         dotprod = torch.matmul(queries,keys.T)
         
-        return F.softmax(nucleotides, dim=1), F.softmax(dotprod, dim=1)
+        return F.softmax(nucleotides, dim=1), F.log_softmax(dotprod, dim=1)
 
 class AttentionDecoderV2(torch.nn.Module):
     def __init__(self, input_channels, output_channels):
