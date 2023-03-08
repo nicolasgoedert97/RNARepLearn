@@ -48,10 +48,10 @@ if not os.path.exists(output_path):
 base_config = read_gin(args.base_gin, False)
 grid_config = read_gin(args.grid_gin, True)
 
-
+id = 0
 for param_vals in itertools.product(*grid_config.values()):
     params = dict(zip(grid_config.keys(), param_vals))
-    output_name= "config_"+"_".join([str(i.split(".")[-1])+str(j) for i,j in params.items()])+".gin"
+    output_name= "config_"+"_".join([str(i.split(".")[-1])+str(j) for i,j in params.items() if not isinstance(j, str)])+".gin"
     output = params | base_config
     dict_to_gin(output, os.path.join(output_path,"gin",output_name))
 

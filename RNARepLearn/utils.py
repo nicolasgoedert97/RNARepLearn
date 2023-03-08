@@ -1,27 +1,98 @@
 import random
 import torch
+from torch.utils.data import Subset
 import numpy as np
 from scipy import sparse
+from sklearn.model_selection import KFold
 from torch_geometric.loader import DataLoader
+from torch_geometric.utils import to_dense_batch
 import pandas as pd
+import warnings
+
+def add_backbone(batch, add_attributes=True):
+    offset = 0
+    output = []
+    for batch_i in range(len(batch.ID)):
+        edges = []
+        seq = batch[batch_i]
+        for i in range(seq.x.shape[0]-1):
+            i+=offset
+            e1 = (i, i+1)
+            e2 = (i+1, i)
+            edges.append(e1)
+            edges.append(e2)
+        output.append(torch.tensor(edges))
+        offset=i+2
+    
+    bb_edges = torch.cat(output).T
+
+    if add_attributes:
+        bp_attributes = torch.unsqueeze(batch.edge_weight, dim=1)
+        bp_attributes = torch.cat([bp_attributes, torch.zeros_like(bp_attributes)], dim=1)
+        bp_attributes = torch.tensor([[0,1]]*len(batch.edge_index[0]))
+
+        bb_attributes = torch.tensor([[0,1]]*bb_edges.shape[1])
+        bb_weights = torch.tensor([1]*bb_edges.shape[1])
+
+        attr = torch.cat([bp_attributes, bb_attributes])
+    
+
+    batch.edge_index = torch.cat([batch.edge_index, bb_edges], dim=1)
+    batch.edge_weight = torch.cat([batch.edge_weight, bb_weights])
+    batch.edge_attr = attr.T
+
+    return batch
+
+def add_backbone_single(x, edge_index, edge_weight, add_attributes=True):
+    
+    edges = []
+    for i in range(x.shape[0]-1):
+        e1 = (i, i+1)
+        e2 = (i+1, i)
+        edges.append(e1)
+        edges.append(e2)
+    bb_edges = torch.tensor(edges).T
+
+    if add_attributes:
+        bp_attributes = torch.unsqueeze(edge_weight, dim=1)
+        bp_attributes = torch.cat([bp_attributes, torch.zeros_like(bp_attributes)], dim=1)
+        
+        bb_attributes = torch.tensor([[0,1]]*bb_edges.shape[1])
+        bb_weights = torch.tensor([1]*bb_edges.shape[1])
+
+        attr = torch.cat([bp_attributes, bb_attributes])
+    
+
+    edge_index = torch.cat([edge_index, bb_edges], dim=1)
+    edge_weight = torch.cat([edge_weight, bb_weights])
+    edge_attr = attr
+
+    return edge_index, edge_weight, edge_attr
 
 def mask_batch(batch, percentage, set_zero=True, seq_zero=True, struc_zero=True):
+
+    num_masked_bases = int((float(percentage)/100)*len(batch.x))
+    node_ids = np.asarray(range(batch.x.shape[0]))
 
     diag = batch.edge_index[0]==batch.edge_index[1] ##true for self edges e.g. diagonal
     eq_1 = batch.edge_weight!=1 ##true for !=1 e.g. Only for bases with unpaired prob != 1
 
     maskable_bases_mask = torch.logical_and(diag,eq_1) # if applied to edge_index[0] (== edge_index[1]) shows indices of nodes with self_edges != 1 
     assert (batch.edge_index[0][maskable_bases_mask] == batch.edge_index[1][maskable_bases_mask]).all()
-
+        
     #select indices fit to mask
     maskable_bases = batch.edge_index[0][maskable_bases_mask]
 
-    #select X% to mask
-    maskable_bases = maskable_bases[[random.randrange(100) < percentage for i in range(len(maskable_bases))]]
+    if (len(maskable_bases) < num_masked_bases):
+        still_to_mask = num_masked_bases - len(maskable_bases)
+        yet_unmasked = torch.tensor(node_ids[~np.isin(node_ids,maskable_bases)])
+        maskable_bases = torch.cat([maskable_bases, yet_unmasked[torch.randperm(len(yet_unmasked))][:still_to_mask]], dim=0)
+    else:
+        #select X% to mask
+        maskable_bases = maskable_bases[torch.randperm(len(maskable_bases))[:num_masked_bases]]
 
 
     # create bool vector of len(nodes) -> mask
-    node_ids = np.asarray(range(batch.x.shape[0]))
     mask = np.isin(node_ids, maskable_bases.cpu())
 
     if set_zero:
@@ -32,9 +103,11 @@ def mask_batch(batch, percentage, set_zero=True, seq_zero=True, struc_zero=True)
         masked_edges = np.union1d(masked_edges_index_from, masked_edges_index_to)
         
         if (seq_zero):
-            batch.x[mask] = torch.tensor([0.0,0.0,0.0,0.0],dtype=torch.float64)
+            batch.x[mask] = torch.tensor([0.0]*batch.x.shape[1],dtype=torch.float64)
         if(struc_zero):
             batch.edge_weight[masked_edges]=0.0
+            if batch.edge_attr is not None:
+                batch.edge_attr[masked_edges]=torch.tensor([0.0,0.0], dtype=torch.double)
     
     return mask
 
@@ -46,11 +119,26 @@ def edge_index_to_weight_list(batch, pred_bpp, mask):
         weightlist.append(pred_bpp[from_edge][to_edge])
     return weightlist
 
+
 def reconstruct_bpp(edge_index, weights, shape):
     mat = sparse.coo_matrix((weights, (edge_index[0], edge_index[1])), shape=shape).toarray()
     return mat
 
-def train_val_test_loaders(dataset, train_split, val_split, test_split, batch_size=32):
+def k_fold_loaders(k, dataset, batch_size=32, num_workers=4):
+    trains = []
+    vals = []
+    split = KFold(k, shuffle=True)
+    splits = split.split(dataset)
+    for i, (train_set, val_set) in enumerate(splits):
+        train = Subset(dataset, train_set)
+        val = Subset(dataset, val_set)
+        trains.append(DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True ))
+        vals.append(DataLoader(val, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True ))
+
+    return trains, vals, None
+
+
+def train_val_test_loaders(dataset, train_split, val_split, test_split, batch_size=32, num_workers=4):
     assert sum([train_split,val_split,test_split]) == 1
     train_size = int(train_split*len(dataset))
     test_size = int(test_split * len(dataset))
@@ -61,7 +149,7 @@ def train_val_test_loaders(dataset, train_split, val_split, test_split, batch_si
     print("Validation:\t"+str(val_size))
     train_set, test_set, val_set = torch.utils.data.random_split(dataset, [train_size, test_size, val_size])
 
-    return DataLoader(train_set, batch_size=batch_size, shuffle=True), DataLoader(val_set, batch_size=batch_size, shuffle=True), DataLoader(test_set, batch_size=batch_size)
+    return DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True), DataLoader(val_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True), DataLoader(test_set, batch_size=batch_size, num_workers=num_workers, pin_memory=True, )
 
 
 def sequence2int_np(sequence):
@@ -69,6 +157,7 @@ def sequence2int_np(sequence):
     return np.array([base2int.get(base, 999) for base in sequence], np.int8)
 
 def generate_edges(seq_len,bpp):
+
     X = np.zeros((seq_len,seq_len))
     X[np.triu_indices(X.shape[0], k = 1)] = bpp
     X = X+X.T
@@ -80,21 +169,16 @@ def generate_edges(seq_len,bpp):
     adf = adf.rename(columns={"level_0":"A","level_1":"B",0:"h_bond"})
     adf = adf[adf["h_bond"]!=0.0]
 
-    # Add Covalent bonds
-    # adf["cov_bond"]=0.0
-
-    # cov_bonds=[]
-    # for tupl in [(float(i),float(i+1)) for i in range(seq_len-1)]:
-    #     cov_bonds.append(tupl)
-    #     cov_bonds.append((tupl[1],tupl[0]))
-    # conv_bonds = pd.DataFrame(cov_bonds, columns=["A","B"])
-    # conv_bonds["h_bond"]=0.0
-    # conv_bonds["cov_bond"]=1.0
-    # adf.append(cov_bonds)
-
-    # adf.drop_duplicates(subset = ['A', 'B'],keep = 'last').reset_index()
-
     return adf
+
+def generate_edges(bpp):
+    df = pd.DataFrame(bpp)
+    adf = df.stack().reset_index()
+    adf = adf.rename(columns={"level_0":"A","level_1":"B",0:"h_bond"})
+    adf = adf[adf["h_bond"]!=0.0]
+    edges = torch.tensor(adf[["A","B"]].to_numpy())
+
+    return edges
 
 def one_hot_encode(seq):
         nuc_d = {0:[1.0,0.0,0.0,0.0],

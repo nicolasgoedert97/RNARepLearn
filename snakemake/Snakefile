@@ -25,5 +25,5 @@ rule train:
         directory(os.path.join(config['output-path'], "{gin}"))
     shell:
         """
-        rnareplearn --gin {input} --output {output} || true
+        rnareplearn --gin {input} --output {output}
         """

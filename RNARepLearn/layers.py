@@ -4,6 +4,7 @@ import torch_geometric
 from torch_geometric.nn import Linear, GCNConv
 from torch_geometric.utils import to_dense_batch, remove_self_loops
 import torch.nn.functional as F
+import gin
 
 
 # H(l-1)AW
@@ -23,11 +24,15 @@ class LinearAggregation(torch_geometric.nn.MessagePassing):
         return norm.view(-1,1) * x_j
 
 class RPINetGNNLayer(torch_geometric.nn.MessagePassing):
-    def __init__(self, input_channels, output_channels, filter_size):
+    def __init__(self, input_channels, output_channels, filter_size, struc_op=None):
         super().__init__()
         self.lin = Linear(input_channels, output_channels)
         self.conv = Conv1d(input_channels, output_channels, filter_size, padding='same')
         self.lstm = LSTM(output_channels, output_channels, batch_first=True)
+        if struc_op is None:
+            self.struc_op = struc_op
+        else:
+            self.struc_op = struc_op(input_channels, output_channels)
 
     def forward(self, x, h0, c0, edge_index, batch, edge_weight):
         #x = [b_S, Lenghth, embed]
@@ -43,11 +48,15 @@ class RPINetGNNLayer(torch_geometric.nn.MessagePassing):
         ## convolution 
         conv_x = self.conv(batched_x)
 
-        # TODO replace with gnn op
         # AH(l-1)W -- Linear projection H(l-1)W -> Aggregated over adjacent neighbour nodes
-        lin_x = self.lin(x)
-        lin_x, _= to_dense_batch(self.propagate(edge_index, x=lin_x, norm=edge_weight), batch)
+        if self.struc_op is None:
+            lin_x = self.lin(x)
+            lin_x, _= to_dense_batch(self.propagate(edge_index, x=lin_x, norm=edge_weight), batch)
 
+        else:
+            lin_x = self.struc_op(x, edge_index, edge_weight)
+            lin_x, _= to_dense_batch(lin_x, batch)
+        
         # linear = aggregated(add) messages of base pairings + conv(filter size 3) = messages from backbone neighbors
 
         messages = torch.transpose(F.relu(torch.transpose(lin_x, 1, 2)+conv_x), 1,2)
@@ -56,9 +65,9 @@ class RPINetGNNLayer(torch_geometric.nn.MessagePassing):
 
                 # if l=1, set cell memory to
         if c0 is None:
-            c0 = torch.zeros(1, batched_x.shape[0], messages.shape[2]).double().cuda()
+            c0 = torch.zeros(1, batched_x.shape[0], messages.shape[2]).double()#.cuda()
         if h0 is None:
-            h0 = torch.zeros(1, batched_x.shape[0], messages.shape[2]).double().cuda()
+            h0 = torch.zeros(1, batched_x.shape[0], messages.shape[2]).double()#.cuda()
 
         
         output, (hn,cn) = self.lstm(messages, (h0, c0))
@@ -91,4 +100,20 @@ class GCN_CNN_Layer(torch_geometric.nn.MessagePassing):
 
         return(out)
 
-        
+@gin.configurable  
+class Sep_Seq_Struc_Layer(torch.nn.Module):
+    def __init__(self, input_channels, output_channels, seq_op, struc_op,gatedGraphConv=False, **kwargs):
+        super().__init__()
+        self.seq_op = seq_op(input_channels, output_channels)
+        self.struc_op = struc_op(input_channels, output_channels)
+
+        if gatedGraphConv:
+            self.struc_op = struc_op(output_channels)
+
+    def forward(self, x, edge_index, edge_weight, batch):
+        seq_x = self.seq_op(x, batch)
+        struc_x = self.struc_op(x, edge_index, edge_weight)
+
+        out = F.relu(seq_x+struc_x)
+
+        return(out)

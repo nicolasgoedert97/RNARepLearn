@@ -20,9 +20,39 @@ class LinearEmbedding(torch.nn.Module):
         data.x = self.lin(data.x)
         return data
 
-@gin.configurable
+
+class GNN_Encoder(torch.nn.Module):
+    def __init__(self, input_channels, output_channels, layer, n_layers ,dim_step=None):
+        super().__init__()
+        layers = []
+        final_output_channels = output_channels
+        for i in range(n_layers):
+
+            if dim_step is not None:
+                output_channels = input_channels*dim_step if input_channels*dim_step <= final_output_channels else final_output_channels
+
+            # add GNN layer
+            layers.append( (layer(input_channels, output_channels), 'x, edge_index, batch, edge_weight -> x' ))
+
+            input_channels = output_channels
+            
+        self.body = Sequential('x, edge_index, batch, edge_weight', layers)
+
+
+    def forward(self, batch):
+
+        out, _ = self.body(batch.x, batch.edge_index, batch.batch, batch.edge_weight)
+
+        out_batch = batch.clone()
+        out_batch.x = out
+        
+        return out_batch
+
+
+#@gin.configurable
+@gin.register
 class RPINetEncoder(torch.nn.Module):
-    def __init__(self, input_channels, output_channels, n_layers, conv_kernel_size ,dim_step=None):
+    def __init__(self, input_channels, output_channels, n_layers, conv_kernel_size ,dim_step=None, struc_op = None):
         super().__init__()
         
         layers = []
@@ -33,7 +63,7 @@ class RPINetEncoder(torch.nn.Module):
                 output_channels = input_channels*dim_step if input_channels*dim_step <= final_output_channels else final_output_channels
 
             # add GNN layer
-            layers.append( (RPINetGNNLayer(input_channels, output_channels, conv_kernel_size), 'x, h0, c0, edge_index, batch, edge_weight -> x, batched_x, c0' ))
+            layers.append( (RPINetGNNLayer(input_channels, output_channels, conv_kernel_size, struc_op), 'x, h0, c0, edge_index, batch, edge_weight -> x, batched_x, c0' ))
 
             input_channels = output_channels
             
@@ -52,6 +82,7 @@ class RPINetEncoder(torch.nn.Module):
         
         return batch
 
+@gin.register
 class AttentionDecoder(torch.nn.Module):
     def __init__(self, input_channels, output_channels):
         super().__init__()
@@ -102,7 +133,7 @@ class TE_Decoder(torch.nn.Module):
         return x.squeeze()
         
         
-@gin.configurable
+@gin.register
 class CNN_Encoder(torch.nn.Module):
     def __init__(self, input_channels, output_channels, kernel_size):
         super().__init__()
@@ -149,3 +180,29 @@ class GCN_Encoder(torch.nn.Module):
         return batch
 
 
+class CNN_Seq(torch.nn.Module):
+    def __init__(self, input_channels, output_channels, kernel_size=9):
+        super().__init__()
+        self.body = Conv1d(input_channels, output_channels, kernel_size, padding='same')
+
+    def forward(self, x, batch):
+        x_batched, mask = to_dense_batch(x, batch)
+        x_batched = torch.transpose(x_batched, 1, 2)
+
+        x_batched = self.body(x_batched)
+
+
+
+
+        return torch.transpose(x_batched, 1, 2)[mask]
+
+
+class pooling_layer(torch.nn.Module):
+    def __init__(self, pooling_method):
+        super().__init__()
+        self.pool = pooling_method
+
+    def forward(self, batch):
+        batch.x = self.pool(batch.x, batch.batch)
+
+        return batch

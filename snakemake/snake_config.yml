@@ -1,3 +1,3 @@
-gin-path: "/lustre/groups/crna01/workspace/nicolas_msc/RNARepLearn/config/PreTrain2"
+gin-path: "/lustre/groups/crna01/workspace/nicolas_msc/RNARepLearn/config/compare_RPI"
 
-output-path: "/lustre/groups/crna01/workspace/nicolas_msc/slurm/runs/PreTrain2"
+output-path: "/lustre/groups/crna01/workspace/nicolas_msc/slurm/runs/compare_RPI_6layers_256channels"

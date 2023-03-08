@@ -4,6 +4,7 @@ notebooks/runs
 notebooks/.ipynb_checkpoints
 5utr/**
 snakemake/.snakemake
+runs/
 
 config/*
 !config/base_configs

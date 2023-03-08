@@ -5,8 +5,10 @@ import pickle
 import pandas as pd
 import numpy as np
 import random
+import gin
 import warnings
-from .utils import one_hot_encode, generate_edges, sequence2int_np
+from .utils import one_hot_encode, generate_edges, sequence2int_np, add_backbone_single
+from torch_geometric.transforms import AddLaplacianEigenvectorPE
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -73,14 +75,17 @@ class SingleRfamDataset(torch_geometric.data.Dataset):
         return torch_geometric.data.Data(x=data["seq"],edge_index=data["edges"].t().contiguous(),edge_weight=data["edge_weight"],rfam=data["rfam"],ID=data["id"])
 
 
-
+@gin.configurable
 class CombinedRfamDataset(torch_geometric.data.Dataset):
 
-    def __init__(self, rfam_dir, rfam_ids, new_dataset_id, seq_length_lim=None,transform=None, pre_transform=None, pre_filter=None):
+    def __init__(self, rfam_dir, rfam_ids, new_dataset_id, seq_length_lim=None,transform=None, pre_transform=None, pre_filter=None, sample_rfams=None, add_backbone=False, add_LPE=False):
         self.dir = rfam_dir
         self.ids = rfam_ids
         self.seq_length_lim=seq_length_lim
         self.processed_files = []
+        self.sample_rfams = sample_rfams
+        self.add_bb = add_backbone
+        self.add_LPE = add_LPE
         
         if new_dataset_id is None:
             new_dataset_id="_".join(rfam_ids if seq_length_lim is None else rfam_ids+[str(seq_length_lim)])
@@ -92,6 +97,23 @@ class CombinedRfamDataset(torch_geometric.data.Dataset):
 
         super().__init__(rfam_dir, transform, pre_transform, pre_filter)
     
+    def pre_compute_Laplacian(self,k):
+        pe = AddLaplacianEigenvectorPE(k)
+        
+
+        for i,f in enumerate(self.processed_file_names):
+            if (i%100 == 0):
+                print(str(i)+"/"+str(len(self.processed_file_names)))
+            if not os.path.exists(os.path.join(self.dir,f.split("/")[0],"laplacianPE_"+str(k))):
+                os.makedirs(os.path.join(self.dir,f.split("/")[0],"laplacianPE_"+str(k)))
+            data = torch.load(os.path.join(self.dir,f))
+            edge_index, edge_weight, edge_attr = add_backbone_single(data["seq"], data["edges"].t().contiguous(), data["edge_weight"])
+            data = torch_geometric.data.Data(x=data["seq"],edge_index=edge_index, edge_weight=edge_weight, edge_attr=edge_attr, rfam=data["rfam"], ID=data["id"])
+            data = pe(data)
+            torch.save(data.laplacian_eigenvector_pe, os.path.join(self.dir,f.split("/")[0],"laplacianPE_"+str(k), f.split("/")[-1]))
+            
+            
+    
     @property
     def processed_file_names(self):
         return self.processed_files
@@ -99,7 +121,16 @@ class CombinedRfamDataset(torch_geometric.data.Dataset):
     def process(self):
         if os.path.exists(os.path.join(self.dir,self.data_id,"files.list")):
             with open(os.path.join(self.dir,self.data_id,"files.list"),"r") as files:
-                self.processed_files.extend(files.read().splitlines())
+                if self.sample_rfams is None:
+                    self.processed_files.extend(files.read().splitlines())
+                else:
+                    rfams = files.read().splitlines()
+                    for rfam in rfams:
+                        rfam_name = rfam[:7]
+
+                        if rfam_name in self.sample_rfams:
+                            self.processed_files.append(rfam)
+
         else:
             for rfam in self.ids:
                 print(rfam)
@@ -122,7 +153,17 @@ class CombinedRfamDataset(torch_geometric.data.Dataset):
 
     def __getitem__(self, index):
         data = torch.load(os.path.join(self.dir,self.processed_file_names[index]))
-        return torch_geometric.data.Data(x=data["seq"],edge_index=data["edges"].t().contiguous(),edge_weight=data["edge_weight"],rfam=data["rfam"],ID=data["id"])
+        if self.add_bb:
+            edge_index, edge_weight, edge_attr = add_backbone_single(data["seq"], data["edges"].t().contiguous(), data["edge_weight"])
+            data = torch_geometric.data.Data(x=data["seq"],edge_index=edge_index, edge_weight=edge_weight, edge_attr=edge_attr, rfam=data["rfam"], ID=data["id"])
+        else:
+            data = torch_geometric.data.Data(x=data["seq"],edge_index=data["edges"].t().contiguous(),edge_weight=data["edge_weight"],rfam=data["rfam"],ID=data["id"])
+        
+        if self.add_LPE:
+            data.x = torch.cat((data.x, torch.load(os.path.join(self.dir,self.processed_file_names[index].split("/")[0],"laplacianPE_"+str(16), self.processed_file_names[index].split("/")[-1]))), dim=1)
+        if self.transform is not None:
+            data = self.transform(data)
+        return data
 
 
 class Dataset_UTR5(torch_geometric.data.Dataset):
@@ -164,6 +205,7 @@ class Dataset_UTR5_hetero(torch_geometric.data.Dataset):
         return len(self.processed_file_names)
     
     def __getitem__(self, index):
+
         data = torch.load(os.path.join(self.dataset_path,"pt",self.files[index]))
         hetero_data = torch_geometric.data.HeteroData(x=data["seq"],edge_index={"b_pairs":data["edges"].t().contiguous(), "backbone":data["backbone_edges"]},edge_weight=data["edge_weight"],mrl=data["mrl"],ID=data["id"], library=data["library"], designed=data["designed"])
         return hetero_data
