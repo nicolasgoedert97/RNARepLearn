@@ -1,6 +1,0 @@
-
-Due to MODULEPATH changes, the following have been reloaded:
-  1) GCCcore/.11.3.0     3) StdEnv/2023        5) zlib/.1.2.12
-  2) Stages/2023         4) binutils/.2.38
-
-rnareplearn --gin een --dataset_path zwee --dataset_type GFILE --train_indices drai --val_indices feier --output fennef --dataset_names siewen aacht neng zeng
