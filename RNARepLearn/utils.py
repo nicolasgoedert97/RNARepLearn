@@ -1,13 +1,19 @@
 import random
 import torch
 from torch.utils.data import Subset
+from sklearn.model_selection import KFold
 import numpy as np
 from scipy import sparse
-from sklearn.model_selection import KFold
-from torch_geometric.loader import DataLoader
+from torch_geometric.loader import DataLoader, DataListLoader
 from torch_geometric.utils import to_dense_batch
 import pandas as pd
 import warnings
+
+def parse_indices(index_path):
+    with open(index_path, "r") as idxs:
+        indices = idxs.readlines()
+        indices = [int(i.strip()) for i in indices]
+        return indices
 
 def add_backbone(batch, add_attributes=True):
     offset = 0
@@ -124,21 +130,8 @@ def reconstruct_bpp(edge_index, weights, shape):
     mat = sparse.coo_matrix((weights, (edge_index[0], edge_index[1])), shape=shape).toarray()
     return mat
 
-def k_fold_loaders(k, dataset, batch_size=32, num_workers=4):
-    trains = []
-    vals = []
-    split = KFold(k, shuffle=True)
-    splits = split.split(dataset)
-    for i, (train_set, val_set) in enumerate(splits):
-        train = Subset(dataset, train_set)
-        val = Subset(dataset, val_set)
-        trains.append(DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True ))
-        vals.append(DataLoader(val, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True ))
 
-    return trains, vals, None
-
-
-def train_val_test_loaders(dataset, train_split, val_split, test_split, batch_size=32, num_workers=4):
+def random_train_val_test_loaders(dataset, train_split, val_split, test_split, batch_size=32, num_workers=4, pin_memory=True):
     assert sum([train_split,val_split,test_split]) == 1
     train_size = int(train_split*len(dataset))
     test_size = int(test_split * len(dataset))
@@ -149,7 +142,46 @@ def train_val_test_loaders(dataset, train_split, val_split, test_split, batch_si
     print("Validation:\t"+str(val_size))
     train_set, test_set, val_set = torch.utils.data.random_split(dataset, [train_size, test_size, val_size])
 
-    return DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True), DataLoader(val_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True), DataLoader(test_set, batch_size=batch_size, num_workers=num_workers, pin_memory=True, )
+    return DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory, drop_last=True), DataLoader(val_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory, drop_last=True), DataLoader(test_set, batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory )
+
+def indexed_train_val_test_loaders(dataset, train_indices, val_indices, test_indices, batch_size=32, num_workers=4, parallel=False):
+    output = []
+    if train_indices is not None:
+        train_indices = parse_indices(train_indices)
+        train_set = Subset(dataset, train_indices)
+        if parallel:
+            output.append(DataListLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True))
+        else:
+            output.append(DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True))
+        print("Training:\t"+str(len(train_set)))
+    else:
+        output.append(None)
+
+    if val_indices is not None:
+        val_indices = parse_indices(val_indices)
+        val_set = Subset(dataset, val_indices)
+        if parallel:
+            val_loader = DataListLoader(val_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
+        else:
+            val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
+        print("Validation:\t"+str(len(val_set)))
+    else:
+        val_loader = None
+    output.append(val_loader)
+    
+    if test_indices is not None:
+        test_indices = parse_indices(test_indices)
+        test_set = Subset(dataset, test_indices)
+        if parallel:
+            test_loader = DataListLoader(test_set, batch_size=batch_size, num_workers=num_workers)
+        else:
+            test_loader = DataLoader(test_set, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
+        print("Test:\t"+str(len(test_set)))
+    else:
+        test_loader = None
+    output.append(test_loader)
+    
+    return output
 
 
 def sequence2int_np(sequence):

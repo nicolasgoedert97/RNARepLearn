@@ -1,0 +1,34 @@
+
+Due to MODULEPATH changes, the following have been reloaded:
+  1) GCCcore/.11.3.0     3) StdEnv/2023        5) zlib/.1.2.12
+  2) Stages/2023         4) binutils/.2.38
+
+Avalaible threads: 24
+DEBUG
+Namespace(gin='/p/project/hai_rnareplearn/RNARepLearn/config/PreTrained_Models/pretrain_RPI_6layers.gin', output='/p/project/hai_rnareplearn/RUNS/600k_pretraining/runsRPI_6layers/fold0', dataset_path='/p/project/hai_rnareplearn/under_300', dataset_type='RFAM', test_on_train=False, dataset_names=None, write_datasets=False, train_indices='/p/project/hai_rnareplearn/RUNS/600k_pretraining/indices/folds/fold0/train.indices', val_indices='/p/project/hai_rnareplearn/RUNS/600k_pretraining/indices/folds/fold0/val.indices', test_indices=None, eval_model=None, train_split=None, val_split=None, test_split=None, data_parallel=False, train_mode='masked', model_state_dict=None, lr=None)
+None
+Dataset length: 695605
+Training:	445188
+Validation:	111296
+Model: 
+Encoder_Decoder_Model(
+  (model): Sequential(
+    (0): RPINetEncoder(
+      (body): Sequential(
+        (0): RPINetGNNLayer()
+        (1): RPINetGNNLayer()
+        (2): RPINetGNNLayer()
+        (3): RPINetGNNLayer()
+        (4): RPINetGNNLayer()
+        (5): RPINetGNNLayer()
+        (6): LSTM(256, 256, bidirectional=True)
+      )
+    )
+    (1): AttentionDecoder(
+      (key_projection): Linear(512, 512, bias=True)
+      (query_projection): Linear(512, 512, bias=True)
+      (nuc_projection): Linear(512, 4, bias=True)
+    )
+  )
+)
+Training running on device: cuda

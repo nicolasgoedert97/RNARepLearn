@@ -54,6 +54,7 @@ class GNN_Encoder(torch.nn.Module):
 class RPINetEncoder(torch.nn.Module):
     def __init__(self, input_channels, output_channels, n_layers, conv_kernel_size ,dim_step=None, struc_op = None):
         super().__init__()
+        self.output_channels = output_channels
         
         layers = []
         final_output_channels = output_channels
@@ -115,6 +116,45 @@ class AttentionDecoderV2(torch.nn.Module):
         nucleotides = self.nuc_projection(x)
         
         return F.softmax(nucleotides, dim=1), F.softmax(attention_weights, dim=1)
+
+class Affinity_Decoder(torch.nn.Module):
+    def __init__(self,input_channels, batch_size, n_prots, **kwargs):
+        super().__init__(**kwargs)
+        self.input_channels = input_channels
+        self.linear_in = torch.nn.Linear(input_channels, input_channels*2)
+        self.linear_hidden = torch.nn.Linear(input_channels*2, input_channels*2)
+        self.linear_out = torch.nn.Linear(input_channels*2, n_prots)
+        self.activation = torch.nn.ReLU()
+        self.dropout = torch.nn.Dropout(p=0.1)
+        self.batch_size = batch_size
+        
+        self.lin_direct = torch.nn.Linear(n_prots, n_prots)
+        
+        #self.gat = GATConv(input_channels, n_prots)
+
+
+
+    def forward(self, batch):
+        x = batch.x
+
+        x = self.linear_in(x)
+        
+        x = self.activation(x)
+        
+        x = self.linear_hidden(x)
+        
+        x = self.activation(x)
+        
+        x = self.linear_out(x)
+        
+        x = global_mean_pool(x, batch.batch)
+        
+        x = self.lin_direct(x)
+        
+
+        return x
+
+
 
 @gin.configurable
 class TE_Decoder(torch.nn.Module):

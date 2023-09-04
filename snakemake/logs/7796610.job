@@ -1,0 +1,118 @@
+
+Avalaible threads: 24
+Dataset length: 0
+Training:	1541372
+Validation:	385342
+Model: 
+Encoder_Decoder_Model(
+  (model): Sequential(
+    (0): Seq_Struc_GNN(
+      (body): Sequential(
+        (0): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(4, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (1): <function relu at 0x14712fbf3920>
+        (2): <function dropout at 0x14712fbf34c0>
+        (3): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (4): <function relu at 0x14712fbf3920>
+        (5): <function dropout at 0x14712fbf34c0>
+        (6): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (7): <function relu at 0x14712fbf3920>
+        (8): <function dropout at 0x14712fbf34c0>
+        (9): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (10): <function relu at 0x14712fbf3920>
+        (11): <function dropout at 0x14712fbf34c0>
+        (12): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (13): <function relu at 0x14712fbf3920>
+        (14): <function dropout at 0x14712fbf34c0>
+        (15): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (16): <function relu at 0x14712fbf3920>
+        (17): <function dropout at 0x14712fbf34c0>
+      )
+    )
+    (1): AttentionDecoder(
+      (key_projection): Linear(512, 512, bias=True)
+      (query_projection): Linear(512, 512, bias=True)
+      (nuc_projection): Linear(512, 4, bias=True)
+    )
+  )
+)
+Training running on device: cuda
+Traceback (most recent call last):
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/bin/rnareplearn", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/RNARepLearn/command_line.py", line 87, in main
+    model, log_dir, train_device, train_mode = train(train_loader=train_loader, val_loader=val_loader, batch_size=batch_size, args=args, log_dir=args.output, data_parallel=args.data_parallel)
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/gin/config.py", line 1605, in gin_wrapper
+    utils.augment_exception_message_and_reraise(e, err_str)
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/gin/utils.py", line 41, in augment_exception_message_and_reraise
+    raise proxy.with_traceback(exception.__traceback__) from None
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/gin/config.py", line 1582, in gin_wrapper
+    return fn(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/RNARepLearn/command_line.py", line 158, in train
+    training.run(train_loader, val_loader)
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/RNARepLearn/train.py", line 61, in run
+    for i,batch in enumerate(data_loader):
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 633, in __next__
+    data = self._next_data()
+           ^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 1345, in _next_data
+    return self._process_data(data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 1371, in _process_data
+    data.reraise()
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/_utils.py", line 644, in reraise
+    raise exception
+ValueError: Caught ValueError in DataLoader worker process 0.
+Original Traceback (most recent call last):
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/utils/data/_utils/worker.py", line 308, in _worker_loop
+    data = fetcher.fetch(index)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/utils/data/_utils/fetch.py", line 51, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+            ~~~~~~~~~~~~^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/utils/data/dataset.py", line 298, in __getitem__
+    return self.dataset[self.indices[idx]]
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/RNARepLearn/datasets.py", line 265, in __getitem__
+    rfam , index_range = self._find_matching_rfam(index)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/RNARepLearn/datasets.py", line 249, in _find_matching_rfam
+    raise ValueError("No Rfam Range found!")
+ValueError: No Rfam Range found!
+
+  In call to configurable 'train' (<function train at 0x1470e0941580>)

@@ -1,0 +1,141 @@
+
+Due to MODULEPATH changes, the following have been reloaded:
+  1) GCCcore/.11.3.0     3) StdEnv/2023        5) zlib/.1.2.12
+  2) Stages/2023         4) binutils/.2.38
+
+Avalaible threads: 24
+DEBUG
+Namespace(gin='/p/project/hai_rnareplearn/RNARepLearn/config/PreTrained_Models/pretrain_GatedGraphConv.gin', output='/p/project/hai_rnareplearn/RUNS/600k_pretraining/runsGatedGraphConv/fold0', dataset_path='/p/project/hai_rnareplearn/under_300', dataset_type='RFAM', test_on_train=False, dataset_names=None, write_datasets=False, train_indices='/p/project/hai_rnareplearn/RUNS/600k_pretraining/indices/folds/fold0/train.indices', val_indices='/p/project/hai_rnareplearn/RUNS/600k_pretraining/indices/folds/fold0/val.indices', test_indices=None, eval_model=None, train_split=None, val_split=None, test_split=None, data_parallel=False, train_mode='masked', model_state_dict=None, lr=None)
+None
+Dataset length: 695605
+Training:	445188
+Validation:	111296
+Model: 
+Encoder_Decoder_Model(
+  (model): Sequential(
+    (0): Seq_Struc_GNN(
+      (body): Sequential(
+        (0): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(4, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (1): <function relu at 0x14b331ee3920>
+        (2): <function dropout at 0x14b331ee34c0>
+        (3): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (4): <function relu at 0x14b331ee3920>
+        (5): <function dropout at 0x14b331ee34c0>
+        (6): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (7): <function relu at 0x14b331ee3920>
+        (8): <function dropout at 0x14b331ee34c0>
+        (9): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (10): <function relu at 0x14b331ee3920>
+        (11): <function dropout at 0x14b331ee34c0>
+        (12): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (13): <function relu at 0x14b331ee3920>
+        (14): <function dropout at 0x14b331ee34c0>
+        (15): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (16): <function relu at 0x14b331ee3920>
+        (17): <function dropout at 0x14b331ee34c0>
+        (18): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (19): <function relu at 0x14b331ee3920>
+        (20): <function dropout at 0x14b331ee34c0>
+        (21): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (22): <function relu at 0x14b331ee3920>
+        (23): <function dropout at 0x14b331ee34c0>
+        (24): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): GatedGraphConv(512, num_layers=1)
+      )
+        (25): <function relu at 0x14b331ee3920>
+        (26): <function dropout at 0x14b331ee34c0>
+      )
+    )
+    (1): AttentionDecoder(
+      (key_projection): Linear(512, 512, bias=True)
+      (query_projection): Linear(512, 512, bias=True)
+      (nuc_projection): Linear(512, 4, bias=True)
+    )
+  )
+)
+Training running on device: cuda
+Traceback (most recent call last):
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/bin/rnareplearn", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/RNARepLearn/command_line.py", line 92, in main
+    model, log_dir, train_device, train_mode = train(train_loader=train_loader, val_loader=val_loader, batch_size=batch_size, args=args, log_dir=args.output, data_parallel=args.data_parallel, model_state_dict=args.model_state_dict, mode=args.train_mode)
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/gin/config.py", line 1605, in gin_wrapper
+    utils.augment_exception_message_and_reraise(e, err_str)
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/gin/utils.py", line 41, in augment_exception_message_and_reraise
+    raise proxy.with_traceback(exception.__traceback__) from None
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/gin/config.py", line 1582, in gin_wrapper
+    return fn(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/RNARepLearn/command_line.py", line 170, in train
+    training.run(train_loader, val_loader)
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/RNARepLearn/train.py", line 78, in run
+    nucs, bpp = self.model(batch)
+                ^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/RNARepLearn/models.py", line 30, in forward
+    return self.model(batch)
+           ^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/nn/modules/container.py", line 217, in forward
+    input = module(input)
+            ^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/RNARepLearn/modules.py", line 103, in forward
+    return F.softmax(nucleotides, dim=1), F.log_softmax(dotprod, dim=1)
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/p/project/hai_rnareplearn/miniconda3/envs/RL/lib/python3.11/site-packages/torch/nn/functional.py", line 1932, in log_softmax
+    ret = input.log_softmax(dim)
+          ^^^^^^^^^^^^^^^^^^^^^^
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 6.00 GiB (GPU 0; 39.39 GiB total capacity; 30.18 GiB already allocated; 1.69 GiB free; 36.22 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
+  In call to configurable 'train' (<function train at 0x14b2e2d8dc60>)

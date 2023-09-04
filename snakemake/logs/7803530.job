@@ -1,0 +1,67 @@
+Avalaible threads: 24
+Dataset length: 695605
+Training:	445187
+Validation:	111297
+Model: 
+Encoder_Decoder_Model(
+  (model): Sequential(
+    (0): Seq_Struc_GNN(
+      (body): Sequential(
+        (0): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(4, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): TAGConv(4, 512, K=6)
+      )
+        (1): <function relu at 0x15023015f920>
+        (2): <function dropout at 0x15023015f4c0>
+        (3): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): TAGConv(512, 512, K=6)
+      )
+        (4): <function relu at 0x15023015f920>
+        (5): <function dropout at 0x15023015f4c0>
+        (6): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): TAGConv(512, 512, K=6)
+      )
+        (7): <function relu at 0x15023015f920>
+        (8): <function dropout at 0x15023015f4c0>
+        (9): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): TAGConv(512, 512, K=6)
+      )
+        (10): <function relu at 0x15023015f920>
+        (11): <function dropout at 0x15023015f4c0>
+        (12): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): TAGConv(512, 512, K=6)
+      )
+        (13): <function relu at 0x15023015f920>
+        (14): <function dropout at 0x15023015f4c0>
+        (15): Sep_Seq_Struc_Layer(
+        (seq_op): CNN_Seq(
+          (body): Conv1d(512, 512, kernel_size=(9,), stride=(1,), padding=same)
+        )
+        (struc_op): TAGConv(512, 512, K=6)
+      )
+        (16): <function relu at 0x15023015f920>
+        (17): <function dropout at 0x15023015f4c0>
+      )
+    )
+    (1): AttentionDecoder(
+      (key_projection): Linear(512, 512, bias=True)
+      (query_projection): Linear(512, 512, bias=True)
+      (nuc_projection): Linear(512, 4, bias=True)
+    )
+  )
+)
+Training running on device: cuda
