@@ -36,7 +36,7 @@ Alternatively to the rfam module, to process training data for immediate use, th
   .
   .
 ```
-Ideally sequece information is provided in fasta or tsv format. Two snakemake workflows are provided to process the data: ´preprocess/5utr´ and ´preprocess/fold´. The ´fold´ workflow takes up fasta files and the ´5utr´ workflow takes .csv files as input, containing columns: ´seq´ for the sequence information and ´5utr´ for the mean ribosome load. These workflows both compute the secondary structure, based on the RNA sequences. For the latter, additionally the 5'UTR mean ribosome load information of each sequence is labeled for the given RNA sequence. This creates a subfolder called ´tfrecord´ for each dataset. 
+Ideally sequece information is provided in fasta or tsv format. Two snakemake workflows are provided to process the data: `preprocess/5utr` and `preprocess/fold`. The `fold` workflow takes up fasta files and the `5utr` workflow takes .csv files as input, containing columns: `seq` for the sequence information and `5utr` for the mean ribosome load. These workflows both compute the secondary structure, based on the RNA sequences. For the latter, additionally the 5'UTR mean ribosome load information of each sequence is labeled for the given RNA sequence. This creates a subfolder called ´tfrecord´ for each dataset. 
 
 
 ``` 
@@ -92,4 +92,4 @@ rnareplearn --gin config.gin
 ``` 
 
 ## Example data
-In the ´example_data´ directory some explanatory notebooks are contained. Additionally, the related example data and pretrained models are provided here: https://www.dropbox.com/scl/fo/hen0xms1f8tux9yzef56r/h?rlkey=piy0yzbp5oeykiqfoe4dk3u7m&dl=0 .
+In the `example_data` directory some explanatory notebooks are contained. Additionally, the related example data and pretrained models are provided here: https://www.dropbox.com/scl/fo/hen0xms1f8tux9yzef56r/h?rlkey=piy0yzbp5oeykiqfoe4dk3u7m&dl=0 .
