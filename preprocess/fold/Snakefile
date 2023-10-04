@@ -1,0 +1,42 @@
+import os
+from pathlib import Path
+
+RELEASE = config['release']
+RELEASE_IDs = os.listdir("../raw/processed/release-"+RELEASE)
+LEN_TRESH = config['seg_len_tresh']
+
+
+RELEASE_IDs = []
+with open("/p/project/hai_rnareplearn/to_rerun.list", "r") as torerun:
+    for rfam in torerun:
+        RELEASE_IDs.append(rfam.strip())
+
+RELEASE_IDs.remove("RF03087")
+RELEASE_IDs.remove("RF00210")
+RELEASE_IDs.remove("RF00040")
+
+
+rule ALL:
+    input:
+        expand('../raw/processed/release-{RELEASE}/{ID}/tfrecord/{ID}.tfrecord', RELEASE=RELEASE, ID=RELEASE_IDs),
+        expand('../raw/processed/release-{RELEASE}/{ID}/tfrecord/{ID}.tfrecord.features.json', RELEASE=RELEASE, ID=RELEASE_IDs),
+        expand('../raw/processed/release-{RELEASE}/{ID}/tfrecord/{ID}.index', RELEASE=RELEASE, ID=RELEASE_IDs)
+
+
+rule fold:
+    input:
+        fasta = '../raw/processed/release-{RELEASE}/{ID}/{ID}.fa',
+        base = '../raw/processed/release-{RELEASE}'
+    output:
+        files = '../raw/processed/release-{RELEASE}/{ID}/tfrecord/{ID}.tfrecord',
+        features = '../raw/processed/release-{RELEASE}/{ID}/tfrecord/{ID}.tfrecord.features.json',
+        index = '../raw/processed/release-{RELEASE}/{ID}/tfrecord/{ID}.index'
+    params:
+        rfam_id = '{ID}'
+
+    threads: 4
+
+    shell:
+        """
+        python scripts/fold_to_tfrecord.py -base {input.base} -rfam {params.rfam_id} -tresh {LEN_TRESH}
+        """

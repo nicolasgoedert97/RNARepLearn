@@ -3,12 +3,13 @@ build/
 notebooks/runs
 notebooks/.ipynb_checkpoints
 5utr/**
-snakemake/.snakemake
+.snakemake/
+snakemake/logs
 runs/
-
+.ipynb_checkpoints/
 config/*
 !config/base_configs
 !config/grid_configs
 !config/create_configs.py
-
+examples/runs
 RNARepLearn/__pychache__
