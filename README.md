@@ -90,3 +90,6 @@ Define datasets and other parameters inside config.gin
 ``` 
 rnareplearn --gin config.gin
 ``` 
+
+## Example data
+In the ´example_data´ directory some explanatory notebooks are contained. Additionally, the related example data and pretrained models are provided here: https://www.dropbox.com/scl/fo/hen0xms1f8tux9yzef56r/h?rlkey=piy0yzbp5oeykiqfoe4dk3u7m&dl=0 .
