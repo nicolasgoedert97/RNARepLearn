@@ -69,9 +69,9 @@ import torch_geometric
 rfam_dir = "../rfam/data/raw/processed/release-14.8"
 rfams = ["RF00001","RF00005"]
 
-from RNARepLearn.datasets import CombinedRfamDataset, SingleRfamDataset
+from RNARepLearn.datasets import GFileDataset
 
-dataset = CombinedRfamDataset(rfam_dir, rfams , "RF00001_RF00005")
+dataset = GFileDataset(rfam_dir, rfams)
 
 from RNARepLearn.utils import train_val_test_loaders
 
