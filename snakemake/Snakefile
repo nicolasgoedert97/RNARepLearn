@@ -1,29 +1,78 @@
 import os
 
+## Parse configs
+if config["ds_names"]=="all":
+    ds_names = os.listdir(config["ds_base_path"])
+else:
+    ds_names = config["ds_names"]
+
+
+run_name = os.path.dirname(config["run_path"])
+
 
 rule all:
     input:
-        expand(os.path.join(config['output-path'], "{gin}"), gin= [g[:-4] for g in os.listdir(os.path.join(config['gin-path'],"gin"))])
+        os.path.join(config["run_path"], "indices/train.indices"),
+        os.path.join(config["run_path"], "indices/test.indices"),
+        expand(os.path.join(config["run_path"], "indices/folds/fold{FOLD}/{TYPE}.indices"), FOLD=[i for i in range(config["k_folds"])], TYPE=["train", "val"]),
+        expand(os.path.join(config['run_path'],"runs{GNN}/fold{FOLD}/final_model"), FOLD=[i for i in range(config["k_folds"])], GNN=["GatedGraphConv_9layers","RPI_9layers","GCN_9layers","GCN_9layers_LSTM", "GatedGraphConv_3layers","RPI_3layers","GCN_3layers","GCN_3layers_LSTM"])
+
     
-# rule create_gins:
-#     input:
-#         base = config['gin-base'],
-#         grid = config['gin-grid'],
-#         out= config['output-path']
-#     output:
-#         path = directory(config["gin-path"]),
-#         done = os.path.join(config["gin-path"],".done")
-#     shell:
-#         "python config/create_configs.py --base-gin {input.base} --grid-gin {input.grid} --output-path {output.path} --log-dir {input.out}"
 
 
+rule split_train_test:
+    input:
+        base = config["ds_base_path"],
+        
+    params:
+        train= config["train_test_split"][0],
+        test = config["train_test_split"][1],
+        ds_names = ds_names,
+        output = directory(os.path.join(config["run_path"], "indices"))
+    output:
+        train = os.path.join(config["run_path"], "indices/train.indices"),
+        test = os.path.join(config["run_path"], "indices/test.indices")
+    shell:
+        "python scripts/split_dataset.py --base {input.base} --rfam {params.ds_names} --train {params.train} --test {params.test} --output {params.output}"
+    
+rule create_k_fold_splits:
+    input:
+        base = config["ds_base_path"],
+        indices = os.path.join(config["run_path"], "indices/train.indices"),
+    params:
+        train= config["train_test_split"][0],
+        test = config["train_test_split"][1],
+        k_folds = config["k_folds"],
+        ds_names = ds_names,
+        output = os.path.join(config["run_path"], "indices")
+    output:
+        folds = expand(os.path.join(config["run_path"], "indices/folds/fold{FOLD}/{TYPE}.indices"), FOLD=[i for i in range(config["k_folds"])], TYPE=["train", "val"])
+    shell:
+        "python scripts/split_dataset.py --base {input.base} --rfam {params.ds_names} --train {params.train} --test {params.test} --output {params.output} --k_fold {params.k_folds}"
 
+
+def train_command(cluster):
+    if cluster:
+        command = "./sbatch_snakemake.sh {input.gin} {input.base} {input.train_indices} {input.val_indices} {params.output} {params.dataset_names}"
+    
+    else:
+        command = "rnareplearn --gin {input.gin} --dataset_path {input.base} --dataset_type RFAM --train_indices {input.train_indices} --val_indices {input.val_indices}  --output {params.output} --dataset_names {params.dataset_names} --train_mode masked"
+    if config["data_parallel"]:
+        command+=" --data_parallel"
+    return command
+    
 rule train:
     input:
-        os.path.join(config['gin-path'],"gin","{gin}.gin")
+        gin = os.path.join(config['gin-path'], "pretrain_{GNN}.gin"),
+        base = config["ds_base_path"],
+        train_indices = os.path.join(config["run_path"], "indices/folds/fold{FOLD}/train.indices"),
+        val_indices = os.path.join(config["run_path"], "indices/folds/fold{FOLD}/val.indices")
     output:
-        directory(os.path.join(config['output-path'], "{gin}"))
+        os.path.join(config['run_path'],"runs{GNN}/fold{FOLD}/final_model")
+    params:
+        output = os.path.join(config['run_path'],"runs{GNN}/fold{FOLD}"),
+        dataset_names = ds_names,
     shell:
-        """
-        rnareplearn --gin {input} --output {output}
-        """
+        train_command(config["cluster"])
+
+

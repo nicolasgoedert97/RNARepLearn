@@ -1,4 +1,5 @@
 import torch
+import torch_geometric
 from torch_geometric.utils import to_dense_batch
 import gin
 import os
@@ -10,26 +11,32 @@ from .losses import BppReconstructionLoss
 
 
 class Training:
-    def __init__(self, model, n_epochs, writer=None, lr=0.01, weight_decay=5e-4):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    def __init__(self, model, n_epochs, writer=None, lr=0.01, weight_decay=5e-4, parallel=False):
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.model = model
-        self.model.to(self.device)
         self.model = model.double()
+        self.model.to(self.device)
+        print("Learning rate: "+str(lr))
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         self.n_epochs = n_epochs
         self.writer = writer
+        self.parallel = parallel
 
         if self.writer is None:
             print("Creating new SummaryWriter")
             self.writer = SummaryWriter()
         
         print("Model: \n"+str(model))
+    
+    def get_lr(self):
+        for param_group in self.optimizer.param_groups:
+            return param_group['lr']
 
 
 @gin.configurable
 class MaskedTraining(Training):
-    def __init__(self, model, n_epochs, masked_percentage, writer, lr=0.002, weight_decay=5e-4 , mask=True, mask_seq=True, mask_struc=True, validation_steps=5, node_loss_weight=1, edge_loss_weight=1, early_stopping_patience=4, add_bb=False, print_out=False):
-        super().__init__(model, n_epochs, writer, lr, weight_decay)
+    def __init__(self, model, n_epochs, masked_percentage, writer, lr=0.002, weight_decay=5e-4 , mask=True, mask_seq=True, mask_struc=True, validation_steps=5, node_loss_weight=1, edge_loss_weight=1, early_stopping_patience=10, add_bb=False, print_out=False, parallel=False):
+        super().__init__(model, n_epochs, writer, lr, weight_decay, parallel)
         self.masked_percentage = masked_percentage
         self.mask = mask
         self.mask_seq = mask_seq
@@ -43,12 +50,13 @@ class MaskedTraining(Training):
     
     def run(self, data_loader, val_loader=None):
         print("Training running on device: "+str(self.device))
+        
         cel_loss = torch.nn.CrossEntropyLoss()
         kl_loss = torch.nn.KLDivLoss(reduction='batchmean')
 
         early_stop = EarlyStopper(patience=self.patience)
 
-        self.model.train()
+        #self.model.train()
 
         step=0
         last_loss = 100
@@ -61,13 +69,20 @@ class MaskedTraining(Training):
                 if self.add_bb:
                     batch = add_backbone(batch, True)
 
+                if self.parallel:
+                    true_x = torch.clone(torch.cat([data.x[:,:4] for data in batch]))
+                    true_weights = torch.clone(torch.cat([data.edge_weight for data in batch]))
+                    train_mask = torch.cat(torch.tensor([mask_batch(graph, self.masked_percentage, self.mask, self.mask_seq, self.mask_struc) for graph in batch]))
+                else:
+                    true_x = torch.clone(batch.x[:,:4])#[:,:4]
+                    true_weights = torch.clone(batch.edge_weight)
 
-                true_x = torch.clone(batch.x[:,:4])#[:,:4]
-                true_weights = torch.clone(batch.edge_weight)
+                    train_mask = mask_batch(batch,self.masked_percentage, self.mask, self.mask_seq, self.mask_struc)
 
-                train_mask = mask_batch(batch,self.masked_percentage, self.mask, self.mask_seq, self.mask_struc)
+                
+                if not self.parallel:
+                    batch.to(self.device)
 
-                batch.to(self.device)
                 self.optimizer.zero_grad()
 
                 nucs, bpp = self.model(batch)
@@ -78,10 +93,6 @@ class MaskedTraining(Training):
                 
                 loss = node_loss * self.node_loss_weight + edge_loss * self.edge_loss_weight
 
-                if (loss.item() > 2*last_loss and batches_saved>0):
-                    batch.x = true_x
-                    torch.save(batch, "/lustre/groups/crna01/workspace/nicolas_msc/slurm/batch_log/"+str(step)+".pt")
-                    batches_saved-=1
                 last_loss = loss.item()
 
                 loss.backward()
@@ -100,7 +111,7 @@ class MaskedTraining(Training):
                     self.writer.add_scalar("Node_Accuracy/train", node_accuracy, step)
                     epoch_loss.append(loss.item())
 
-            epoch_loss = sum(epoch_loss)/len(epoch_loss)
+            epoch_loss = (sum(epoch_loss)/len(epoch_loss) if len(epoch_loss)>0 else 0)
             self.writer.add_scalar("Epoch_Loss/train", epoch_loss , epoch)
 
             if val_loader is not None:
@@ -128,9 +139,9 @@ class MaskedTraining(Training):
                         edge_loss_val_list.append(edge_loss_val_step.item())
                         node_accuracy_val_list.append(node_accuracy_val_step.item())
 
-                    node_loss_val = sum(node_loss_val_list)/len(node_loss_val_list)
-                    edge_loss_val = sum(edge_loss_val_list)/len(edge_loss_val_list)
-                    node_accuracy_val = sum(node_accuracy_val_list)/len(node_accuracy_val_list)
+                    node_loss_val = sum(node_loss_val_list)/len(node_loss_val_list) if len(node_loss_val_list)>0 else 0
+                    edge_loss_val = sum(edge_loss_val_list)/len(edge_loss_val_list) if len(edge_loss_val_list)>0 else 0
+                    node_accuracy_val = sum(node_accuracy_val_list)/len(node_accuracy_val_list) if len(node_accuracy_val_list)>0 else 0
 
                     val_loss = node_loss_val * self.node_loss_weight + edge_loss_val * self.edge_loss_weight
 
@@ -225,13 +236,18 @@ class AutoEncoder(Training):
 
 class TETraining(Training):
 
+    def __init__(self, model, n_epochs, writer, lr=0.00002, weight_decay=5e-4 ,parallel=False, early_stopping_patience=None):
+        super().__init__(model, n_epochs, writer, lr, weight_decay, parallel)
+        self.early_stopping_patience = early_stopping_patience
+
     def run(self, train_loader, val_loader=None):
         print("Training running on device: "+str(self.device))
         mse_loss = torch.nn.MSELoss()
 
         self.model.train()
 
-        early_stop = EarlyStopper(patience=5)
+        if self.early_stopping_patience is not None:
+            early_stop = EarlyStopper(patience=self.early_stopping_patience)
 
         step=0
         for epoch in range(self.n_epochs):
@@ -277,9 +293,81 @@ class TETraining(Training):
                 self.writer.add_scalar("Epoch_Loss/val", val_loss, epoch)
                 self.writer.add_scalar("Epoch_Loss/train", loss, epoch)
 
-                if early_stop.early_stop(val_loss):
-                    print("Earlystopped after Epoch "+str(epoch)+" with patience of "+str(early_stop.patience))
-                    break
+                if self.early_stopping_patience is not None:
+                    if early_stop.early_stop(val_loss):
+                        print("Earlystopped after Epoch "+str(epoch)+" with patience of "+str(early_stop.patience))
+                        break
                 
             self.writer.flush()
+            torch.save(self.model.state_dict(), os.path.join(self.writer.log_dir, "model_epoch"+str(epoch)))
+        self.writer.close()
+
+
+class AffinityTraining(Training):
+
+    def __init__(self, model, n_epochs, writer, lr=0.00002, weight_decay=5e-4 ,parallel=False, early_stopping_patience=None, bce_loss_weight=None):
+        super().__init__(model, n_epochs, writer, lr, weight_decay, parallel)
+        self.early_stopping_patience = early_stopping_patience
+        self.class_weight = bce_loss_weight
+
+    def run(self, train_loader,  n_prots, val_loader=None):
+        print("Training running on device: "+str(self.device))
+        bce_loss = torch.nn.BCEWithLogitsLoss(reduction='mean', pos_weight=self.class_weight)
+
+        self.model.train()
+
+        if self.early_stopping_patience is not None:
+            early_stop = EarlyStopper(patience=self.early_stopping_patience)
+
+        step=0
+        for epoch in range(self.n_epochs):
+            epoch_loss = []
+            for idx, batch in enumerate(train_loader):
+
+                batch.to(self.device)
+                self.optimizer.zero_grad()
+
+
+                pred_affinity = self.model(batch)
+
+                loss = bce_loss(pred_affinity.cpu(), batch.binding_prots.view(len(batch.ID), n_prots).double().cpu())
+                epoch_loss.append(loss.item())
+
+                loss.backward()
+                self.optimizer.step()
+
+                if idx % 10 == 0:
+                    print('\r[Epoch %4d/%4d] [Batch %4d/%4d] Loss: % 2.2e' % (epoch + 1, self.n_epochs, 
+                                                                        idx + 1, len(train_loader), 
+                                                                        loss.item()))
+                    self.writer.add_scalar("Loss/train", loss.item(), step)
+                step+=1
+
+            if val_loader is not None:
+                self.model.eval()
+                val_loss = []
+                with torch.no_grad():
+                    for batch in val_loader:
+                        batch.to(self.device)
+
+                        pred_affinity = self.model(batch)
+
+                        val_loss_step = bce_loss(pred_affinity.cpu(), batch.binding_prots.view(len(batch.ID), n_prots).double().cpu())
+                        val_loss.append(val_loss_step.item())
+
+
+                self.model.train()
+                val_loss = sum(val_loss)/len(val_loss)
+                loss = sum(epoch_loss)/len(epoch_loss)
+
+                self.writer.add_scalar("Epoch_Loss/val", val_loss, epoch)
+                self.writer.add_scalar("Epoch_Loss/train", loss, epoch)
+
+                if self.early_stopping_patience is not None:
+                    if early_stop.early_stop(val_loss):
+                        print("Earlystopped after Epoch "+str(epoch)+" with patience of "+str(early_stop.patience))
+                        break
+                
+            self.writer.flush()
+            torch.save(self.model.state_dict(), os.path.join(self.writer.log_dir, "model_epoch"+str(epoch)))
         self.writer.close()

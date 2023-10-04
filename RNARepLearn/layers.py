@@ -1,7 +1,7 @@
 import torch
 from torch.nn import LSTM, Conv1d
 import torch_geometric
-from torch_geometric.nn import Linear, GCNConv
+from torch_geometric.nn import Linear, GCNConv, GatedGraphConv
 from torch_geometric.utils import to_dense_batch, remove_self_loops
 import torch.nn.functional as F
 import gin
@@ -65,9 +65,9 @@ class RPINetGNNLayer(torch_geometric.nn.MessagePassing):
 
                 # if l=1, set cell memory to
         if c0 is None:
-            c0 = torch.zeros(1, batched_x.shape[0], messages.shape[2]).double()#.cuda()
+            c0 = torch.zeros(1, batched_x.shape[0], messages.shape[2]).double().cuda()
         if h0 is None:
-            h0 = torch.zeros(1, batched_x.shape[0], messages.shape[2]).double()#.cuda()
+            h0 = torch.zeros(1, batched_x.shape[0], messages.shape[2]).double().cuda()
 
         
         output, (hn,cn) = self.lstm(messages, (h0, c0))
@@ -102,13 +102,14 @@ class GCN_CNN_Layer(torch_geometric.nn.MessagePassing):
 
 @gin.configurable  
 class Sep_Seq_Struc_Layer(torch.nn.Module):
-    def __init__(self, input_channels, output_channels, seq_op, struc_op,gatedGraphConv=False, **kwargs):
+    def __init__(self, input_channels, output_channels, seq_op, struc_op, no_input_channels=False ,**kwargs):
         super().__init__()
         self.seq_op = seq_op(input_channels, output_channels)
-        self.struc_op = struc_op(input_channels, output_channels)
-
-        if gatedGraphConv:
-            self.struc_op = struc_op(output_channels)
+        if no_input_channels:
+            self.struc_op = struc_op(output_channels, **kwargs)
+        else:
+            self.struc_op = struc_op(input_channels, output_channels)
+            
 
     def forward(self, x, edge_index, edge_weight, batch):
         seq_x = self.seq_op(x, batch)
@@ -117,3 +118,34 @@ class Sep_Seq_Struc_Layer(torch.nn.Module):
         out = F.relu(seq_x+struc_x)
 
         return(out)
+
+@gin.configurable  
+class Sep_Seq_Struc_Layer_LSTM(torch.nn.Module):
+    def __init__(self, input_channels, output_channels, seq_op, struc_op, no_input_channels=False ,**kwargs):
+        super().__init__()
+        self.seq_op = seq_op(input_channels, output_channels)
+        
+        if no_input_channels:
+            self.struc_op = struc_op(output_channels)
+        else:
+            self.struc_op = struc_op(input_channels, output_channels)
+            
+        self.lstm = LSTM(output_channels, output_channels, batch_first=True)
+
+    def forward(self, x, edge_index, edge_weight, batch, cell_mem):
+        seq_x = self.seq_op(x, batch)
+        struc_x = self.struc_op(x, edge_index, edge_weight)
+
+        out = F.relu(seq_x+struc_x)
+
+        out, mask = to_dense_batch(out, batch)
+
+
+        if cell_mem is None:
+            cell_mem = torch.zeros(1, out.shape[0], out.shape[2]).double().cuda()
+        
+        h0 = torch.zeros(1, out.shape[0], out.shape[2]).double().cuda()
+
+        out, (hn,cn) = self.lstm(out, (h0, cell_mem))
+
+        return out[mask], out, cn

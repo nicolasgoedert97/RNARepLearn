@@ -1,0 +1,21 @@
+## Define output path for run
+run_path: "/p/project/hai_rnareplearn/RUNS/TE_design_3layers"
+
+## Define initial dataset
+ds_base_path: "/p/project/hai_rnareplearn/5utr/data/designed"
+ds_names: ["GSM3130443_designed_lib"]
+
+## Separate Test/Train 
+train_test_split: [0.8, 0.2]
+
+## create k_folds (no folds: k=1)
+k_folds: 5
+k_fold_split: [0.9, 0.1]
+
+##pretrained models
+pretrained_models: "/p/project/hai_rnareplearn/RUNS/600k_pretraining_25epochs_undirected"
+
+
+gin-path: "/p/project/hai_rnareplearn/RNARepLearn/config/PreTrained_Models"
+
+cluster: True

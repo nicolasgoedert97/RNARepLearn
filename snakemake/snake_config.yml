@@ -1,3 +1,20 @@
-gin-path: "/lustre/groups/crna01/workspace/nicolas_msc/RNARepLearn/config/compare_RPI"
+## Define output path for run
+run_path: "/p/project/hai_rnareplearn/RUNS/600k_pretraining_25epochs_undirected"
 
-output-path: "/lustre/groups/crna01/workspace/nicolas_msc/slurm/runs/compare_RPI_6layers_256channels"
+## Define initial dataset
+ds_base_path: "/p/project/hai_rnareplearn/small_RFAM"
+ds_names: "all"
+
+## Separate Test/Train 
+train_test_split: [0.8, 0.2]
+
+## create k_folds (no folds: k=1)
+k_folds: 1
+k_fold_split: [0.8, 0.2]
+
+
+gin-path: "/p/project/hai_rnareplearn/RNARepLearn/config/PreTrained_Models"
+
+cluster: True
+
+data_parallel: False
